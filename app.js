@@ -19,6 +19,7 @@ const compassionRoutes = require('./routes/compassionRoutes')
 const messageRoutes = require('./routes/messageRoutes')
 const pollingOfficerRoutes = require('./routes/pollingOfficerRoutes')
 const documentRoutes = require('./routes/documentRoutes')
+const minutesRoutes = require('./routes/minutesRoutes')
 require('dotenv').config();
 const fs = require('fs');
 const cors = require('cors')
@@ -124,6 +125,7 @@ app.use('/api/compassion', compassionRoutes);
 app.use('/messages', messageRoutes);
 app.use('/polling-officer', pollingOfficerRoutes);
 app.use('/documents', documentRoutes);
+app.use('/minutes', minutesRoutes);
 
 // Serve uploaded files statically
 const uploadsPath = path.join(__dirname, 'uploads');
