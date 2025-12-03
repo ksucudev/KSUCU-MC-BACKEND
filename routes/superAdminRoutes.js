@@ -6,6 +6,7 @@ const superAdminMiddleware = require('../middlewares/superAdmin');
 // Authentication routes
 router.post('/signup', superAdmin.signup);
 router.post('/login', superAdmin.login);
+router.get('/verify', superAdminMiddleware, superAdmin.verify);
 
 router.post('/logout', superAdminMiddleware, superAdmin.logout);
 

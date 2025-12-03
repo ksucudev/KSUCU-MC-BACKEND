@@ -13,6 +13,7 @@
     "create-super-admin": "node scripts/createSuperAdmin.js",
     "create-polling-officer": "node scripts/createPollingOfficer.js",
     "create-test-users": "node scripts/createTestUsers.js",
+    "reset-minutes-pin": "node scripts/resetMinutesPin.js",
     "test:polling": "node tests/testPollingSystem.js"
   },
   "dependencies": {

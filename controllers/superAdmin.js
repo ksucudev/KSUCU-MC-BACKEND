@@ -77,6 +77,12 @@ exports.logout = (req, res) => {
     res.status(200).json({ message: 'Logout successful' });
 };
 
+// Verify session
+exports.verify = (req, res) => {
+    // If middleware passes, session is valid
+    res.status(200).json({ valid: true, message: 'Session is valid' });
+};
+
 exports.getUsers = async (req, res) => {
     try {
         const users = await Users.find({}, { _id: 0, password: 0, googleId: 0 }); 

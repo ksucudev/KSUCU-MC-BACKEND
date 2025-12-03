@@ -48,7 +48,12 @@ const upload = multer({
   }
 });
 
-// All routes require super admin authentication
+// PIN routes (require super admin authentication)
+router.get('/pin/status', superAdminMiddleware, minutesController.checkPinStatus);
+router.post('/pin/setup', superAdminMiddleware, minutesController.setupPin);
+router.post('/pin/verify', superAdminMiddleware, minutesController.verifyPin);
+
+// All other routes require super admin authentication
 router.use(superAdminMiddleware);
 
 // Upload minutes document

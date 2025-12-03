@@ -1,4 +1,6 @@
 const Minutes = require('../models/minutes');
+const MinutesPin = require('../models/minutesPin');
+const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 
@@ -33,7 +35,7 @@ exports.uploadMinutes = async (req, res) => {
     const minutes = new Minutes({
       title: title.trim(),
       date: minutesDate,
-      uploadedBy: req.user._id,
+      uploadedBy: req.userId,
       filename: req.file.filename,
       originalName: req.file.originalname,
       filePath: req.file.path,
@@ -264,5 +266,74 @@ exports.getMinutesStats = async (req, res) => {
   } catch (error) {
     console.error('Error fetching minutes stats:', error);
     res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+};
+
+// Check if PIN exists (to determine if setup is needed)
+exports.checkPinStatus = async (req, res) => {
+  try {
+    const pinDoc = await MinutesPin.getPin();
+    res.status(200).json({
+      hasPin: !!pinDoc,
+      needsSetup: !pinDoc
+    });
+  } catch (error) {
+    console.error('Error checking PIN status:', error);
+    res.status(500).json({ error: 'Failed to check PIN status' });
+  }
+};
+
+// Set up new PIN (only if no PIN exists)
+exports.setupPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN must be exactly 4 digits' });
+    }
+
+    // Check if PIN already exists
+    const existingPin = await MinutesPin.getPin();
+    if (existingPin) {
+      return res.status(400).json({ error: 'PIN already set. Use reset to change it.' });
+    }
+
+    // Hash the PIN
+    const pinHash = await bcrypt.hash(pin, 10);
+
+    // Create new PIN document
+    const newPin = new MinutesPin({ pinHash });
+    await newPin.save();
+
+    res.status(201).json({ message: 'PIN set successfully' });
+  } catch (error) {
+    console.error('Error setting up PIN:', error);
+    res.status(500).json({ error: 'Failed to set up PIN' });
+  }
+};
+
+// Verify PIN
+exports.verifyPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+
+    if (!pin || pin.length !== 4) {
+      return res.status(400).json({ error: 'Invalid PIN format' });
+    }
+
+    const pinDoc = await MinutesPin.getPin();
+    if (!pinDoc) {
+      return res.status(400).json({ error: 'No PIN set. Setup required.' });
+    }
+
+    const isValid = await bcrypt.compare(pin, pinDoc.pinHash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Incorrect PIN' });
+    }
+
+    res.status(200).json({ message: 'PIN verified', valid: true });
+  } catch (error) {
+    console.error('Error verifying PIN:', error);
+    res.status(500).json({ error: 'Failed to verify PIN' });
   }
 };
