@@ -4,6 +4,8 @@ const userController = require('../controllers/userController');
 const userAuthMiddleware = require('../middlewares/userAuthMiddleware')
 
 router.post('/login', userController.login);
+router.post('/signup', userController.signup);
+router.post('/check-exists', userController.checkUserExists);
 router.post('/save-soul', userAuthMiddleware, userController.saveSoul);
 router.post('/bibleStudy', userController.bibleStudy);
 router.get('/countSaved', userController.countSaved);

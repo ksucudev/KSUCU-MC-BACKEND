@@ -357,8 +357,8 @@ exports.logout = async (req, res) => {
 exports.feedback = async (req, res) => {
   try {
 
-      const userId = req.userId; 
-      
+      const userId = req.userId;
+
       const user = await User.findById(userId);
 
       let { anonymous, name, message } = req.body;
@@ -369,12 +369,142 @@ exports.feedback = async (req, res) => {
 
       const feedback = new FeedBack({ anonymous, name, message });
       await feedback.save();
-      
+
       res.status(201).json({ message: 'Feedback submitted successfully' });
   } catch (error) {
     console.log(error);
-    
+
       res.status(500).json({ error: 'Server error' });
   }
-  
+
+};
+
+// Check if user exists by email or phone
+exports.checkUserExists = async (req, res) => {
+  try {
+    let { email, phone } = req.body;
+
+    if (!email && !phone) {
+      return res.status(400).json({ message: 'Email or phone is required' });
+    }
+
+    // Normalize email to lowercase
+    if (email) {
+      email = email.toLowerCase().trim();
+    }
+    if (phone) {
+      phone = phone.trim();
+    }
+
+    // Check if user exists by email or phone
+    const query = [];
+    if (email) query.push({ email });
+    if (phone) query.push({ phone });
+
+    const user = await User.findOne({ $or: query });
+
+    if (user) {
+      return res.status(200).json({
+        exists: true,
+        message: 'User found in database',
+        hasEmail: !!user.email,
+        hasPhone: !!user.phone
+      });
+    }
+
+    return res.status(200).json({
+      exists: false,
+      message: 'User not found in database'
+    });
+
+  } catch (error) {
+    console.error('Error checking user existence:', error);
+    res.status(500).json({ message: 'Error checking user existence' });
+  }
+};
+
+// Self-registration for users (without admin)
+exports.signup = async (req, res) => {
+  try {
+    let { username, email, phone, course, reg, yos, ministry, et } = req.body;
+
+    // Validate required fields
+    if (!username || !email || !phone || !course || !reg || !yos || !ministry || !et) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    // Normalize and clean data (remove extra spaces)
+    username = username.trim().replace(/\s+/g, ' ');
+    email = email.toLowerCase().trim();
+    phone = phone.trim().replace(/\s+/g, '');
+    course = course.trim().replace(/\s+/g, ' ');
+    reg = reg.trim().replace(/\s+/g, '');
+    yos = yos.toString().trim();
+    ministry = ministry.trim();
+    et = et.trim().toLowerCase();
+
+    // Validate phone format (10 digits starting with 0)
+    const phoneRegex = /^0\d{9}$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({ message: 'Phone number must be 10 digits starting with 0' });
+    }
+
+    // Validate year of study (1-6)
+    const yosNum = parseInt(yos);
+    if (isNaN(yosNum) || yosNum < 1 || yosNum > 6) {
+      return res.status(400).json({ message: 'Year of study must be between 1 and 6' });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ $or: [{ email }, { phone }, { reg }] });
+    if (existingUser) {
+      if (existingUser.email === email) {
+        return res.status(400).json({ message: 'Email already registered' });
+      }
+      if (existingUser.phone === phone) {
+        return res.status(400).json({ message: 'Phone number already registered' });
+      }
+      if (existingUser.reg === reg) {
+        return res.status(400).json({ message: 'Registration number already registered' });
+      }
+    }
+
+    // Use phone number as default password (same as admission process)
+    const hashedPassword = await bcrypt.hash(phone, 10);
+
+    // Create new user
+    const newUser = new User({
+      username,
+      email,
+      phone,
+      course,
+      reg,
+      yos,
+      ministry,
+      et,
+      password: hashedPassword
+    });
+
+    await newUser.save();
+
+    console.log('New user self-registered:', {
+      username,
+      email,
+      phone,
+      reg
+    });
+
+    res.status(201).json({
+      message: 'Registration successful! You can now login.',
+      loginGuide: {
+        email: email,
+        password: 'Your phone number (' + phone + ')',
+        instructions: 'Use your email as username and your phone number as password to login.'
+      }
+    });
+
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({ message: 'Error during registration. Please try again.' });
+  }
 };
