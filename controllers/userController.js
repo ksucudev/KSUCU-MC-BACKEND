@@ -12,7 +12,7 @@ const backendURL = 'https://ksucu-mc.co.ke'
 exports.login = async (req, res) => {
   try {
     let { email, password } = req.body;
-    
+
     // Enhanced logging for debugging device-specific issues
     console.log('🔐 LOGIN ATTEMPT:', {
       email: email?.toLowerCase(),
@@ -23,7 +23,7 @@ exports.login = async (req, res) => {
       referer: req.headers.referer,
       timestamp: new Date().toISOString()
     });
-    
+
     email = email.toLowerCase();
 
     if (!email || !password) {
@@ -33,7 +33,7 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       console.log('invalid username');
-      
+
       return res.status(401).json({ message: 'Invalid username or password' });
     }
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -52,14 +52,14 @@ exports.login = async (req, res) => {
       // Add domain if in production for better cookie sharing
       ...(process.env.NODE_ENV === 'production' && { domain: '.ksucu-mc.co.ke' })
     };
-    
+
     console.log('🍪 Setting cookie with options:', cookieOptions);
     console.log('🍪 User agent:', req.headers['user-agent']);
     console.log('🍪 Origin:', req.headers.origin);
-    
+
     // Set httpOnly cookie for API requests (secure)
     res.cookie('user_s', token, cookieOptions);
-    
+
     // Set accessible cookie for socket authentication
     const socketCookieOptions = {
       ...cookieOptions,
@@ -68,8 +68,8 @@ exports.login = async (req, res) => {
     res.cookie('socket_token', token, socketCookieOptions);
 
     // Sending a success response
-     res.status(200).json({ message: 'Login successful' });
-    
+    res.status(200).json({ message: 'Login successful' });
+
   } catch (error) {
     console.error('❌ Login error:', error);
     console.error('❌ Error stack:', error.stack);
@@ -83,13 +83,13 @@ exports.login = async (req, res) => {
       error: errorMessage
     });
   }
-  
+
 }
 
-exports.saveSoul = async (req,res) => {
+exports.saveSoul = async (req, res) => {
   const { name, phone, region, village } = req.body;
 
-  const existingUser = await Soul.findOne({phone});
+  const existingUser = await Soul.findOne({ phone });
   if (existingUser) {
     return res.status(400).json({ message: 'Email or phone already exists' });
   }
@@ -105,19 +105,19 @@ exports.saveSoul = async (req,res) => {
 
 }
 
-exports.countSaved = async (req,res) => {
+exports.countSaved = async (req, res) => {
   try {
-    const soulCount = await Soul.countDocuments(); 
+    const soulCount = await Soul.countDocuments();
     res.json({ count: soulCount });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching user count' });
   }
 }
 
-exports.bibleStudy = async (req,res) => {
+exports.bibleStudy = async (req, res) => {
   const { name, residence, yos, phone, gender, isPastor } = req.body;
 
-  const existingUser = await bs.findOne({phone});
+  const existingUser = await bs.findOne({ phone });
   if (existingUser) {
     return res.status(400).json({ message: 'Email or phone already exists' });
   }
@@ -170,9 +170,9 @@ exports.forgetPassword = async (req, res) => {
         <p style="color: #730051; font-size: 14px; text-align: center; margin-top: 20px;">Thank you,<br><strong>The Kisii University Christian Union Dev Team</strong></p>
       </div>
     `;
-    
+
     await sendMail(email, subject, html);
-       
+
 
     res.status(200).json({ message: 'Password reset email sent successfully!' });
 
@@ -196,7 +196,7 @@ exports.resetPassword = async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_USER_SECRET);
-    
+
     const userEmail = decoded.email;
 
     if (!userEmail) {
@@ -219,15 +219,15 @@ exports.resetPassword = async (req, res) => {
 exports.getUserData = async (req, res) => {
   try {
     const userId = req.userId; // Extract user ID from authentication middleware
-    
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     // Generate fresh socket token for authenticated users
     const token = jwt.sign({ userId: user._id }, process.env.JWT_USER_SECRET, { expiresIn: '30d' });
-    
+
     // Set socket token cookie (accessible to JavaScript)
     const socketCookieOptions = {
       httpOnly: false, // Make accessible for socket auth
@@ -236,7 +236,7 @@ exports.getUserData = async (req, res) => {
       sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
       ...(process.env.NODE_ENV === 'production' && { domain: '.ksucu-mc.co.ke' })
     };
-    
+
     res.cookie('socket_token', token, socketCookieOptions);
 
     const userData = {
@@ -244,9 +244,9 @@ exports.getUserData = async (req, res) => {
       username: user.username,
       email: user.email,
       yos: user.yos,
-      ministry : user.ministry,
-      reg : user.reg,
-      et : user.et,
+      ministry: user.ministry,
+      reg: user.reg,
+      et: user.et,
       course: user.course,
       phone: user.phone
     };
@@ -284,10 +284,10 @@ exports.updateUserData = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const message = password && password.trim() !== '' 
-      ? 'User details and password updated successfully' 
+    const message = password && password.trim() !== ''
+      ? 'User details and password updated successfully'
       : 'User details updated successfully';
-    
+
     res.status(200).json({ message });
   } catch (error) {
     console.log('Error updating user:', error);
@@ -303,7 +303,7 @@ exports.logout = async (req, res) => {
       userAgent: req.headers['user-agent'],
       timestamp: new Date().toISOString()
     });
-    
+
     // Clear all possible cookie variations with different options
     const cookiesToClear = ['token', 'user_s', 'loginToken', 'sessionToken', 'authToken'];
     const cookieOptions = [
@@ -334,16 +334,16 @@ exports.logout = async (req, res) => {
         domain: '.ksucu-mc.co.ke'
       }] : [])
     ];
-    
+
     // Clear each cookie with all possible option combinations
     cookiesToClear.forEach(cookieName => {
       cookieOptions.forEach(options => {
         res.clearCookie(cookieName, options);
       });
     });
-    
+
     console.log('🍪 Cleared all cookies with multiple option combinations');
-    return res.status(200).json({ 
+    return res.status(200).json({
       message: 'Logout successful',
       clearedCookies: cookiesToClear,
       timestamp: new Date().toISOString()
@@ -357,24 +357,24 @@ exports.logout = async (req, res) => {
 exports.feedback = async (req, res) => {
   try {
 
-      const userId = req.userId;
+    const userId = req.userId;
 
-      const user = await User.findById(userId);
+    const user = await User.findById(userId);
 
-      let { anonymous, name, message } = req.body;
+    let { anonymous, name, message } = req.body;
 
-      if (!anonymous){
-        name = user.username;
-      }
+    if (!anonymous) {
+      name = user.username;
+    }
 
-      const feedback = new FeedBack({ anonymous, name, message });
-      await feedback.save();
+    const feedback = new FeedBack({ anonymous, name, message });
+    await feedback.save();
 
-      res.status(201).json({ message: 'Feedback submitted successfully' });
+    res.status(201).json({ message: 'Feedback submitted successfully' });
   } catch (error) {
     console.log(error);
 
-      res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 
 };
@@ -506,5 +506,31 @@ exports.signup = async (req, res) => {
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ message: 'Error during registration. Please try again.' });
+  }
+};
+
+// Search users for attendance quick check-in
+exports.searchUsers = async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    if (!query || query.length < 3) {
+      return res.status(400).json({ message: 'Search query must be at least 3 characters' });
+    }
+
+    // Search by username or registration number (case insensitive)
+    const users = await User.find({
+      $or: [
+        { username: { $regex: query, $options: 'i' } },
+        { reg: { $regex: query, $options: 'i' } }
+      ]
+    })
+      .select('username reg course yos phone') // Only return necessary fields
+      .limit(10); // Limit results for speed and UX
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ message: 'Error searching users' });
   }
 };
