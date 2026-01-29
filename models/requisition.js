@@ -50,7 +50,29 @@ const requisitionSchema = new mongoose.Schema({
   releasedBy: String,
   releasedAt: Date,
   returnedAt: Date,
-  comments: String
+  comments: String,
+  approvedBy: String,
+  approvedAt: Date,
+  approvalSignature: String,
+  approvalSignatureDate: Date,
+  notificationSent: {
+    type: Boolean,
+    default: false
+  },
+  pdfUrl: String,
+  pdfGeneratedAt: Date,
+  userAcknowledged: {
+    type: Boolean,
+    default: false
+  },
+  userAcknowledgedAt: Date,
+  assetTransfer: {
+    receivedByName: String,
+    receivedBySignature: String,
+    releasedByName: String,
+    releasedBySignature: String,
+    date: String
+  }
 }, {
   timestamps: true
 });
