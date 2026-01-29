@@ -239,6 +239,18 @@ exports.signAnonymous = async (req, res) => {
         session.attendanceCount += 1;
         await session.save();
 
+        // Broadcast new attendance record to all leaders
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('newAttendance', {
+                record: {
+                    ...attendanceRecord.toObject(),
+                    signature: undefined // Don't send heavy signature via socket
+                },
+                sessionId
+            });
+        }
+
         res.json({
             message: 'Attendance signed successfully',
             record: attendanceRecord
@@ -315,7 +327,16 @@ exports.getRecords = async (req, res) => {
             return res.status(403).json({ message: `Access denied. Owned by ${session.leadershipRole}` });
         }
 
-        const records = await AttendanceRecord.find({ sessionId })
+        const includeSignatures = req.query.signatures === 'true';
+
+        let query = AttendanceRecord.find({ sessionId });
+
+        // Exclude signature by default to prevent payload bloat/crashes
+        if (!includeSignatures) {
+            query = query.select('-signature');
+        }
+
+        const records = await query
             .populate('userId', 'username email')
             .sort({ signedAt: -1 });
 
