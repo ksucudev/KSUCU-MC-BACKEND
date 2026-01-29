@@ -382,24 +382,22 @@ exports.feedback = async (req, res) => {
 // Check if user exists by email or phone
 exports.checkUserExists = async (req, res) => {
   try {
-    let { email, phone } = req.body;
+    let { email, phone, regNo } = req.body;
 
-    if (!email && !phone) {
-      return res.status(400).json({ message: 'Email or phone is required' });
+    if (!email && !phone && !regNo) {
+      return res.status(400).json({ message: 'Email, phone or registration number is required' });
     }
 
-    // Normalize email to lowercase
-    if (email) {
-      email = email.toLowerCase().trim();
-    }
-    if (phone) {
-      phone = phone.trim();
-    }
+    // Normalize inputs
+    if (email) email = email.toLowerCase().trim();
+    if (phone) phone = phone.trim();
+    if (regNo) regNo = regNo.trim().toUpperCase();
 
-    // Check if user exists by email or phone
+    // Check if user exists by email, phone, or regNo
     const query = [];
     if (email) query.push({ email });
     if (phone) query.push({ phone });
+    if (regNo) query.push({ reg: regNo }); // Field in model is 'reg'
 
     const user = await User.findOne({ $or: query });
 
@@ -407,8 +405,14 @@ exports.checkUserExists = async (req, res) => {
       return res.status(200).json({
         exists: true,
         message: 'User found in database',
-        hasEmail: !!user.email,
-        hasPhone: !!user.phone
+        user: {
+          username: user.username,
+          regNo: user.reg,
+          course: user.course,
+          year: user.yos,
+          phone: user.phone,
+          ministry: user.ministry
+        }
       });
     }
 

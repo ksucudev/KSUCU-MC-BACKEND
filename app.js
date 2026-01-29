@@ -23,75 +23,81 @@ const minutesRoutes = require('./routes/minutesRoutes')
 require('dotenv').config();
 const fs = require('fs');
 const cors = require('cors')
-const cookieParser = require ('cookie-parser');
+const cookieParser = require('cookie-parser');
 
 // Ensure the 'uploads' folder exists
 let uploadDir;
 
 if (process.env.NODE_ENV === 'production') {
-    // Use local uploads directory instead of /var/www/uploads for now
-    uploadDir = path.join(__dirname, 'uploads');
+  // Use local uploads directory instead of /var/www/uploads for now
+  uploadDir = path.join(__dirname, 'uploads');
 } else {
-    uploadDir = path.join(__dirname, 'uploads');
+  uploadDir = path.join(__dirname, 'uploads');
 }
 
 // Ensure the upload directory exists
 if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
+  fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 
 const app = express();
 const server = http.createServer(app);
 
-app.use(express.json({ limit: "10mb" })); 
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 const corsOptions = {
-    origin: function(origin, callback) {
-      const nodeEnv = (process.env.NODE_ENV || '').trim();
-      console.log(`CORS Request from origin: "${origin}", NODE_ENV: "${nodeEnv}"`);
+  origin: function (origin, callback) {
+    const nodeEnv = (process.env.NODE_ENV || '').trim();
+    console.log(`CORS Request from origin: "${origin}", NODE_ENV: "${nodeEnv}"`);
 
-      // More permissive CORS for production debugging
-      if (nodeEnv === 'development') {
-        const devOrigins = ['http://localhost:5173','http://localhost:5174','http://localhost:5175','http://localhost:5176'];
-        console.log(`Dev allowed origins:`, devOrigins);
-        
-        if (devOrigins.includes(origin) || !origin) {
-          console.log(`CORS allowed for dev origin: ${origin}`);
-          callback(null, true);
-        } else {
-          console.log(`CORS blocked for dev origin: ${origin}`);
-          callback(new Error('Not allowed by CORS'));
-        }
+    // More permissive CORS for production debugging
+    if (nodeEnv === 'development') {
+      const devOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'];
+      console.log(`Dev allowed origins:`, devOrigins);
+
+      const isLocalOrigin = !origin ||
+        devOrigins.includes(origin) ||
+        origin.startsWith('http://192.168.') ||
+        origin.startsWith('http://10.') ||
+        origin.includes('.local:');
+
+      if (isLocalOrigin) {
+        console.log(`CORS allowed for dev origin: ${origin}`);
+        callback(null, true);
       } else {
-        // Production: be more permissive to fix the login issues
-        const prodOrigins = [
-          'https://www.ksucu-mc.co.ke', 
-          'https://ksucu-mc.co.ke',
-          'http://www.ksucu-mc.co.ke',
-          'http://ksucu-mc.co.ke'
-        ];
-        
-        console.log(`Production allowed origins:`, prodOrigins);
-        console.log(`Checking if "${origin}" is in allowed origins...`);
-        
-        // More flexible matching for production
-        if (!origin || 
-            prodOrigins.includes(origin) ||
-            (origin && origin.includes('ksucu-mc.co.ke'))) {
-          console.log(`CORS allowed for production origin: ${origin}`);
-          callback(null, true);
-        } else {
-          console.log(`CORS blocked for production origin: ${origin}`);
-          console.log(`Origin type: ${typeof origin}, value: "${origin}"`);
-          callback(new Error('Not allowed by CORS'));
-        }
+        console.log(`CORS blocked for dev origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
       }
-    },
-    credentials: true, // Allow credentials (cookies) to be sent
-    optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+    } else {
+      // Production: be more permissive to fix the login issues
+      const prodOrigins = [
+        'https://www.ksucu-mc.co.ke',
+        'https://ksucu-mc.co.ke',
+        'http://www.ksucu-mc.co.ke',
+        'http://ksucu-mc.co.ke'
+      ];
+
+      console.log(`Production allowed origins:`, prodOrigins);
+      console.log(`Checking if "${origin}" is in allowed origins...`);
+
+      // More flexible matching for production
+      if (!origin ||
+        prodOrigins.includes(origin) ||
+        (origin && origin.includes('ksucu-mc.co.ke'))) {
+        console.log(`CORS allowed for production origin: ${origin}`);
+        callback(null, true);
+      } else {
+        console.log(`CORS blocked for production origin: ${origin}`);
+        console.log(`Origin type: ${typeof origin}, value: "${origin}"`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
+  credentials: true, // Allow credentials (cookies) to be sent
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
 app.use(cors(corsOptions));
 
@@ -101,11 +107,11 @@ console.log('Attempting to connect to MongoDB at:', dbUri);
 mongoose.connect(dbUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-}).then(()=>{
-    console.log('MongoDB connected successfully');
-}).catch((err)=>{
-    console.error('MongoDB connection error:', err.message);
-    console.error('Full error:', err);
+}).then(() => {
+  console.log('MongoDB connected successfully');
+}).catch((err) => {
+  console.error('MongoDB connection error:', err.message);
+  console.error('Full error:', err);
 });
 
 app.use('/users', userRoutes);
@@ -133,40 +139,40 @@ console.log('📁 Static files: Serving uploads from:', uploadsPath);
 console.log('📁 Static files: Directory exists:', fs.existsSync(uploadsPath));
 
 if (process.env.NODE_ENV === 'production') {
-    app.use('/uploads', express.static(uploadsPath));
+  app.use('/uploads', express.static(uploadsPath));
 } else {
-    app.use('/uploads', express.static(uploadsPath));
+  app.use('/uploads', express.static(uploadsPath));
 }
 
-if(process.env.NODE_ENV === 'production'){
-    app.use(express.static(path.join(__dirname, '../KSUCU-MC-FRONTEND/dist')));
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../KSUCU-MC-FRONTEND/dist')));
 
-    app.get('*', (req,res) => {
-        res.sendFile(
-            path.resolve(__dirname, '../', 'KSUCU-MC-FRONTEND', 'dist', 'index.html')
-        )
-    })
-} else{
-    app.get('/', (req, res) => res.send('Please set to production'))
+  app.get('*', (req, res) => {
+    res.sendFile(
+      path.resolve(__dirname, '../', 'KSUCU-MC-FRONTEND', 'dist', 'index.html')
+    )
+  })
+} else {
+  app.get('/', (req, res) => res.send('Please set to production'))
 }
 
 // Setup Socket.IO
 const io = socketIo(server, {
   cors: {
-    origin: function(origin, callback) {
+    origin: function (origin, callback) {
       const nodeEnv = (process.env.NODE_ENV || '').trim();
       if (nodeEnv === 'development') {
-        const devOrigins = ['http://localhost:5173','http://localhost:5174','http://localhost:5175','http://localhost:5176'];
+        const devOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'];
         if (devOrigins.includes(origin) || !origin) {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
         }
       } else {
-        if (!origin || 
-            (origin && (origin.includes('localhost') || 
-                       origin.includes('127.0.0.1') ||
-                       origin.includes('ksucu-mc.co.ke')))) {
+        if (!origin ||
+          (origin && (origin.includes('localhost') ||
+            origin.includes('127.0.0.1') ||
+            origin.includes('ksucu-mc.co.ke')))) {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
@@ -190,7 +196,7 @@ io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;
     console.log(`🔐 Socket auth - Token received: ${token ? 'Yes' : 'No'}, Token value: ${token}`);
-    
+
     // Require authentication - no guest access
     if (!token || token === 'guest') {
       console.log('❌ Socket auth - No valid token provided, rejecting connection');
@@ -202,7 +208,7 @@ io.use(async (socket, next) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_USER_SECRET);
       console.log('🔍 Socket auth - JWT decoded successfully, userId:', decoded.userId);
-      
+
       const user = await User.findById(decoded.userId);
       if (user) {
         socket.userId = decoded.userId;
@@ -256,7 +262,7 @@ io.on('connection', async (socket) => {
   socket.on('sendMessage', async (data) => {
     try {
       const { message, messageType = 'text', replyTo } = data;
-      
+
       const newMessage = new ChatMessage({
         senderId: socket.userId,
         senderName: socket.username,
@@ -285,7 +291,7 @@ io.on('connection', async (socket) => {
   socket.on('editMessage', async (data) => {
     try {
       const { messageId, message } = data;
-      
+
       const chatMessage = await ChatMessage.findById(messageId);
       if (!chatMessage || chatMessage.senderId.toString() !== socket.userId) {
         socket.emit('error', { message: 'Not authorized to edit this message' });
@@ -311,7 +317,7 @@ io.on('connection', async (socket) => {
   socket.on('deleteMessage', async (data) => {
     try {
       const { messageId } = data;
-      
+
       const chatMessage = await ChatMessage.findById(messageId);
       if (!chatMessage) {
         socket.emit('error', { message: 'Message not found' });
@@ -320,7 +326,7 @@ io.on('connection', async (socket) => {
 
       // Check authorization - only authenticated users
       const isAuthorized = socket.userId && chatMessage.senderId && chatMessage.senderId.toString() === socket.userId;
-      
+
       if (!isAuthorized) {
         socket.emit('error', { message: 'Not authorized to delete this message' });
         return;
@@ -341,7 +347,7 @@ io.on('connection', async (socket) => {
   socket.on('deleteMessageForMe', async (data) => {
     try {
       const { messageId } = data;
-      
+
       const chatMessage = await ChatMessage.findById(messageId);
       if (!chatMessage) {
         socket.emit('error', { message: 'Message not found' });
@@ -349,24 +355,24 @@ io.on('connection', async (socket) => {
       }
 
       // Check if message already deleted for this user
-      const alreadyDeleted = chatMessage.deletedFor.some(del => 
+      const alreadyDeleted = chatMessage.deletedFor.some(del =>
         del.userId && del.userId.toString() === socket.userId
       );
 
       if (!alreadyDeleted) {
         // Add user to deletedFor array
-        chatMessage.deletedFor.push({ 
-          userId: socket.userId, 
-          deletedAt: new Date() 
+        chatMessage.deletedFor.push({
+          userId: socket.userId,
+          deletedAt: new Date()
         });
         await chatMessage.save();
       }
 
       // Only notify the specific user
-      socket.emit('messageDeletedForUser', { 
-        messageId, 
+      socket.emit('messageDeletedForUser', {
+        messageId,
         userId: socket.userId,
-        username: socket.username 
+        username: socket.username
       });
     } catch (error) {
       console.error('Error deleting message for user:', error);
@@ -378,7 +384,7 @@ io.on('connection', async (socket) => {
   socket.on('updateMessageStatus', async (data) => {
     try {
       const { messageId, status } = data;
-      
+
       const chatMessage = await ChatMessage.findById(messageId);
       if (!chatMessage) {
         socket.emit('error', { message: 'Message not found' });
@@ -409,7 +415,7 @@ io.on('connection', async (socket) => {
   socket.on('addReaction', async (data) => {
     try {
       const { messageId, reactionType } = data;
-      
+
       if (!['like', 'dislike'].includes(reactionType)) {
         socket.emit('error', { message: 'Invalid reaction type' });
         return;
@@ -430,11 +436,11 @@ io.on('connection', async (socket) => {
       const oppositeArray = reactionType === 'like' ? chatMessage.reactions.dislikes : chatMessage.reactions.likes;
 
       // Check if user already reacted
-      const existingReactionIndex = reactionArray.findIndex(reaction => 
+      const existingReactionIndex = reactionArray.findIndex(reaction =>
         reaction.userId && reaction.userId.toString() === socket.userId.toString()
       );
 
-      const oppositeReactionIndex = oppositeArray.findIndex(reaction => 
+      const oppositeReactionIndex = oppositeArray.findIndex(reaction =>
         reaction.userId && reaction.userId.toString() === socket.userId.toString()
       );
 
@@ -457,9 +463,9 @@ io.on('connection', async (socket) => {
       await chatMessage.save();
 
       // Broadcast reaction update to all users
-      io.to('community-chat').emit('reactionUpdate', { 
-        messageId, 
-        reactions: chatMessage.reactions 
+      io.to('community-chat').emit('reactionUpdate', {
+        messageId,
+        reactions: chatMessage.reactions
       });
 
     } catch (error) {
@@ -476,7 +482,7 @@ io.on('connection', async (socket) => {
       // Update user status to offline
       await OnlineUsers.findOneAndUpdate(
         { userId: socket.userId },
-        { 
+        {
           status: 'offline',
           lastSeen: new Date()
         }
