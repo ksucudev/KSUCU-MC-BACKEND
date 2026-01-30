@@ -104,7 +104,10 @@ const chatMessageSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Indexes for query optimization
 chatMessageSchema.index({ timestamp: -1 });
 chatMessageSchema.index({ senderId: 1 });
+// Compound index for the main messages query: find({ deleted: false }).sort({ timestamp: -1 })
+chatMessageSchema.index({ deleted: 1, timestamp: -1 });
 
 module.exports = mongoose.model('ChatMessage', chatMessageSchema);

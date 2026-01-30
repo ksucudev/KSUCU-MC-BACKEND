@@ -51,8 +51,11 @@ const upload = multer({
 // Get recent messages
 exports.getMessages = async (req, res) => {
   try {
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
+    
+    console.log(`📊 Getting messages: page=${page}, limit=${limit}, skip=${skip}`);
+    const startTime = Date.now();
 
     const messages = await ChatMessage.find({ deleted: false })
       .sort({ timestamp: -1 })
@@ -60,10 +63,13 @@ exports.getMessages = async (req, res) => {
       .skip(skip)
       .populate('replyTo', 'message senderName timestamp')
       .lean();
+    
+    const queryTime = Date.now() - startTime;
+    console.log(`📊 Query completed in ${queryTime}ms, found ${messages.length} messages`);
 
     res.json({
       success: true,
-      messages: messages.reverse(), // Reverse to show oldest first
+      messages: messages.reverse(),
       hasMore: messages.length === parseInt(limit)
     });
   } catch (error) {
@@ -96,6 +102,13 @@ exports.sendMessage = async (req, res) => {
 
     // Populate replyTo field for response
     await newMessage.populate('replyTo', 'message senderName timestamp');
+
+    // Broadcast new message to all connected clients
+    const io = req.app.get('io');
+    if (io) {
+      io.to('community-chat').emit('newMessage', newMessage);
+      console.log('💬 New message broadcasted:', newMessage._id);
+    }
 
     res.json({ success: true, message: newMessage });
   } catch (error) {
@@ -220,12 +233,25 @@ exports.deleteMessage = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
 
-    if (chatMessage.senderId.toString() !== userId) {
+    // Check if user is super admin
+    const User = require('../models/user');
+    const user = await User.findById(userId);
+    const isSuperAdmin = user && user.role === 'super_admin';
+
+    // Allow deletion if user is the sender OR is a super admin
+    if (chatMessage.senderId.toString() !== userId && !isSuperAdmin) {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this message' });
     }
 
     chatMessage.deleted = true;
     await chatMessage.save();
+
+    // Broadcast deletion to all connected clients
+    const io = req.app.get('io');
+    if (io) {
+      io.to('community-chat').emit('messageDeleted', messageId);
+      console.log('🗑️ Message deleted and broadcasted:', messageId);
+    }
 
     res.json({ success: true, message: 'Message deleted' });
   } catch (error) {
