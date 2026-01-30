@@ -133,16 +133,28 @@ app.use('/polling-officer', pollingOfficerRoutes);
 app.use('/documents', documentRoutes);
 app.use('/minutes', minutesRoutes);
 
-// Serve uploaded files statically
+// Serve uploaded files statically with CORS headers
 const uploadsPath = path.join(__dirname, 'uploads');
 console.log('📁 Static files: Serving uploads from:', uploadsPath);
 console.log('📁 Static files: Directory exists:', fs.existsSync(uploadsPath));
 
-if (process.env.NODE_ENV === 'production') {
-  app.use('/uploads', express.static(uploadsPath));
-} else {
-  app.use('/uploads', express.static(uploadsPath));
-}
+// Add CORS middleware specifically for uploads to allow cross-origin media loading
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+}, express.static(uploadsPath, {
+  setHeaders: (res, path) => {
+    // Set cache headers for media files
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
+  }
+}));
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../KSUCU-MC-FRONTEND/dist')));

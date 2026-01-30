@@ -15,15 +15,15 @@ async function createUser() {
 
         // User credentials and details
         const userData = {
-            username: 'John Doe',
-            email: 'john.doe@student.ksucu.ac.ke',
+            username: 'John Kamau',
+            email: 'john.kamau646@students.ksu.ac.ke',
             password: 'user123',
-            phone: '+254712345678',
-            reg: 'REG/2024/001',
+            phone: '0710123456',
+            reg: '20221234',
             yos: '3',
             ministry: 'Praise & Worship',
             course: 'Computer Science',
-            et: 'Morning'
+            et: 'baptised'
         };
 
         // Check if user already exists
