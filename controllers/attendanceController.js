@@ -68,9 +68,11 @@ exports.endSession = async (req, res) => {
     }
 };
 
-// Get all active sessions
+// Get sessions (all active, or all including inactive if requested)
 exports.getSessionStatus = async (req, res) => {
     try {
+        const includeInactive = req.query.all === 'true';
+
         // No-cache headers
         res.set({
             'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
@@ -81,12 +83,16 @@ exports.getSessionStatus = async (req, res) => {
             'Vary': 'Origin, Accept-Encoding'
         });
 
-        // Find all active sessions, sorted by latest first
-        const activeSessions = await AttendanceSession.find({ isActive: true }).sort({ startTime: -1 });
+        let query = {};
+        if (!includeInactive) {
+            query.isActive = true;
+        }
+
+        const sessions = await AttendanceSession.find(query).sort({ startTime: -1 });
 
         res.json({
-            message: activeSessions.length > 0 ? 'Active sessions found' : 'No active sessions',
-            sessions: activeSessions
+            message: sessions.length > 0 ? 'Sessions found' : 'No sessions found',
+            sessions
         });
 
     } catch (error) {
@@ -460,5 +466,59 @@ exports.resetSystem = async (req, res) => {
     } catch (error) {
         console.error('Error resetting system:', error);
         res.status(500).json({ message: 'Error resetting system', error: error.message });
+    }
+};
+// Delete session and all its records
+exports.deleteSession = async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) {
+            return res.status(400).json({ message: 'Session ID is required' });
+        }
+
+        const session = await AttendanceSession.findById(sessionId);
+        if (!session) {
+            return res.status(404).json({ message: 'Session not found' });
+        }
+
+        // Delete all associated records first
+        const recordsResult = await AttendanceRecord.deleteMany({ sessionId });
+
+        // Delete the session itself
+        await AttendanceSession.findByIdAndDelete(sessionId);
+
+        res.json({
+            message: 'Session and records deleted successfully',
+            recordsDeleted: recordsResult.deletedCount
+        });
+
+    } catch (error) {
+        console.error('Error deleting session:', error);
+        res.status(500).json({ message: 'Error deleting session', error: error.message });
+    }
+};
+
+// Re-open a closed session
+exports.reopenSession = async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) {
+            return res.status(400).json({ message: 'Session ID is required' });
+        }
+
+        const session = await AttendanceSession.findById(sessionId);
+        if (!session) {
+            return res.status(404).json({ message: 'Session not found' });
+        }
+
+        session.isActive = true;
+        session.endTime = undefined;
+        await session.save();
+
+        res.json({ message: 'Session re-opened successfully', session });
+
+    } catch (error) {
+        console.error('Error re-opening session:', error);
+        res.status(500).json({ message: 'Error re-opening session', error: error.message });
     }
 };
