@@ -34,6 +34,9 @@ router.post('/session/open', attendanceController.openSession);
 // Close active session (admin)
 router.post('/session/close', attendanceController.closeSession);
 
+// Extend session duration (admin)
+router.post('/session/extend', attendanceController.extendSession);
+
 // Force close any active session
 router.post('/session/force-close', attendanceController.forceCloseSession);
 
