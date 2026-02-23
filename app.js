@@ -20,6 +20,7 @@ const messageRoutes = require('./routes/messageRoutes')
 const pollingOfficerRoutes = require('./routes/pollingOfficerRoutes')
 const documentRoutes = require('./routes/documentRoutes')
 const minutesRoutes = require('./routes/minutesRoutes')
+const profilePhotoRoutes = require('./routes/profilePhotoRoutes')
 require('dotenv').config();
 const fs = require('fs');
 const cors = require('cors')
@@ -101,7 +102,13 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-const dbUri = process.env.DB_CONNECTION_URI || 'mongodb://127.0.0.1:27017/ksucu-mc';
+let dbUri = process.env.DB_CONNECTION_URI || 'mongodb://127.0.0.1:27017/ksucu-mc';
+
+// Force 127.0.0.1 instead of localhost to avoid IPv6 issues (::1) in Node.js 18+
+if (dbUri.includes('localhost')) {
+  dbUri = dbUri.replace('localhost', '127.0.0.1');
+}
+
 console.log('Attempting to connect to MongoDB at:', dbUri);
 
 mongoose.connect(dbUri, {
@@ -132,6 +139,7 @@ app.use('/messages', messageRoutes);
 app.use('/polling-officer', pollingOfficerRoutes);
 app.use('/documents', documentRoutes);
 app.use('/minutes', minutesRoutes);
+app.use('/api/users', profilePhotoRoutes);
 
 // Serve uploaded files statically with CORS headers
 const uploadsPath = path.join(__dirname, 'uploads');
@@ -144,7 +152,7 @@ app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
-  
+
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
