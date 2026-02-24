@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -20,7 +21,7 @@ const messageRoutes = require('./routes/messageRoutes')
 const pollingOfficerRoutes = require('./routes/pollingOfficerRoutes')
 const documentRoutes = require('./routes/documentRoutes')
 const minutesRoutes = require('./routes/minutesRoutes')
-require('dotenv').config();
+
 const fs = require('fs');
 const cors = require('cors')
 const cookieParser = require('cookie-parser');
