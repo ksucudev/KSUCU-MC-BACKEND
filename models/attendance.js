@@ -1,10 +1,16 @@
 const mongoose = require('mongoose');
 
 const attendanceSessionSchema = new mongoose.Schema({
+    title: {
+        type: String,
+        required: true,
+        trim: true
+    },
     ministry: {
         type: String,
         required: true,
-        enum: ['Praise and Worship', 'Choir', 'Wananzambe', 'Ushering', 'Creativity', 'Compassion', 'Intercessory', 'High School', 'Church School', 'General']
+        enum: ['Praise and Worship', 'Choir', 'Wananzambe', 'Ushering', 'Creativity', 'Compassion', 'Intercessory', 'High School', 'Church School', 'General'],
+        default: 'General'
     },
     leadershipRole: {
         type: String,
@@ -21,13 +27,22 @@ const attendanceSessionSchema = new mongoose.Schema({
     endTime: {
         type: Date
     },
+    durationMinutes: {
+        type: Number,
+        default: 60 // Default 1 hour
+    },
+    shortId: {
+        type: String,
+        unique: true,
+        sparse: true // Allow null for old sessions but unique for new ones
+    },
     attendanceCount: {
         type: Number,
         default: 0
     },
     forcedClosedBy: {
         type: String,
-        required: false // Only set if session was forcefully closed
+        required: false
     }
 }, {
     timestamps: true
@@ -95,11 +110,11 @@ const AttendanceRecord = mongoose.model('AttendanceRecord', attendanceRecordSche
 async function fixDatabaseIndexes() {
     try {
         console.log('Checking and fixing database indexes...');
-        
+
         // Get all indexes
         const indexes = await AttendanceRecord.collection.getIndexes();
         console.log('Current indexes:', Object.keys(indexes));
-        
+
         // Remove the incorrect sessionId_1_userId_1 index if it exists
         const wrongIndexName = 'sessionId_1_userId_1';
         if (indexes[wrongIndexName]) {
@@ -107,11 +122,11 @@ async function fixDatabaseIndexes() {
             await AttendanceRecord.collection.dropIndex(wrongIndexName);
             console.log(`Dropped incorrect index: ${wrongIndexName}`);
         }
-        
+
         // Ensure the correct index exists
         try {
             await AttendanceRecord.collection.createIndex(
-                { sessionId: 1, regNo: 1 }, 
+                { sessionId: 1, regNo: 1 },
                 { unique: true, name: 'sessionId_1_regNo_1' }
             );
             console.log('Correct index (sessionId + regNo) ensured');
@@ -122,7 +137,7 @@ async function fixDatabaseIndexes() {
                 console.error('Error creating correct index:', error);
             }
         }
-        
+
         console.log('Database indexes fixed!');
     } catch (error) {
         console.error('Error fixing database indexes:', error);
@@ -130,7 +145,17 @@ async function fixDatabaseIndexes() {
 }
 
 // Run the fix when the model is loaded
-setTimeout(fixDatabaseIndexes, 2000); // Wait 2 seconds for DB connection
+const runIndexFix = async () => {
+    // If not connected, wait a bit and try again
+    if (mongoose.connection.readyState !== 1) {
+        console.log('Waiting for MongoDB connection before fixing indexes...');
+        setTimeout(runIndexFix, 5000);
+        return;
+    }
+    await fixDatabaseIndexes();
+};
+
+runIndexFix();
 
 module.exports = {
     AttendanceSession,

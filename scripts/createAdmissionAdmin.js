@@ -6,7 +6,8 @@ require('dotenv').config();
 const createAdmissionAdmin = async () => {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.DB_CONNECTION_URI, {
+    const dbUri = process.env.DB_CONNECTION_URI || 'mongodb://127.0.0.1:27017/ksucu-mc';
+    await mongoose.connect(dbUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
@@ -14,8 +15,8 @@ const createAdmissionAdmin = async () => {
     console.log('Connected to MongoDB');
 
     // Check if admission admin already exists
-    const existingAdmin = await AdmissionAdmin.findOne({ 
-      email: 'admin@ksucumcadmissionadmin.co.ke' 
+    const existingAdmin = await AdmissionAdmin.findOne({
+      email: 'admin@ksucumcadmissionadmin.co.ke'
     });
 
     if (existingAdmin) {

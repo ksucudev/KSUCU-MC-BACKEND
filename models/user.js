@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
   course: { type: String },
   et: { type: String },
   password: { type: String },
+  profilePhoto: { type: String, default: null }, // URL path to profile photo
   hasVoted: { type: Boolean, default: false },
   votedAt: { type: Date },
   votedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'PollingOfficer' },

@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -21,7 +20,8 @@ const messageRoutes = require('./routes/messageRoutes')
 const pollingOfficerRoutes = require('./routes/pollingOfficerRoutes')
 const documentRoutes = require('./routes/documentRoutes')
 const minutesRoutes = require('./routes/minutesRoutes')
-
+const profilePhotoRoutes = require('./routes/profilePhotoRoutes')
+require('dotenv').config();
 const fs = require('fs');
 const cors = require('cors')
 const cookieParser = require('cookie-parser');
@@ -102,7 +102,13 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-const dbUri = process.env.DB_CONNECTION_URI || 'mongodb://127.0.0.1:27017/ksucu-mc';
+let dbUri = process.env.DB_CONNECTION_URI || 'mongodb://127.0.0.1:27017/ksucu-mc';
+
+// Force 127.0.0.1 instead of localhost to avoid IPv6 issues (::1) in Node.js 18+
+if (dbUri.includes('localhost')) {
+  dbUri = dbUri.replace('localhost', '127.0.0.1');
+}
+
 console.log('Attempting to connect to MongoDB at:', dbUri);
 
 mongoose.connect(dbUri, {
@@ -133,17 +139,30 @@ app.use('/messages', messageRoutes);
 app.use('/polling-officer', pollingOfficerRoutes);
 app.use('/documents', documentRoutes);
 app.use('/minutes', minutesRoutes);
+app.use('/api/users', profilePhotoRoutes);
 
-// Serve uploaded files statically
+// Serve uploaded files statically with CORS headers
 const uploadsPath = path.join(__dirname, 'uploads');
 console.log('📁 Static files: Serving uploads from:', uploadsPath);
 console.log('📁 Static files: Directory exists:', fs.existsSync(uploadsPath));
 
-if (process.env.NODE_ENV === 'production') {
-  app.use('/uploads', express.static(uploadsPath));
-} else {
-  app.use('/uploads', express.static(uploadsPath));
-}
+// Add CORS middleware specifically for uploads to allow cross-origin media loading
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+}, express.static(uploadsPath, {
+  setHeaders: (res, path) => {
+    // Set cache headers for media files
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
+  }
+}));
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../KSUCU-MC-FRONTEND/dist')));
@@ -519,4 +538,5 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT} - Restarted`));
+// Force restart timestamp: 2026-01-30

@@ -34,11 +34,20 @@ router.post('/session/open', attendanceController.openSession);
 // Close active session (admin)
 router.post('/session/close', attendanceController.closeSession);
 
+// Extend session duration (admin)
+router.post('/session/extend', attendanceController.extendSession);
+
 // Force close any active session
 router.post('/session/force-close', attendanceController.forceCloseSession);
 
 // Reset session and clear records
 router.post('/session/reset', attendanceController.resetSystem);
+
+// Delete session and records (admin)
+router.post('/session/delete', attendanceController.deleteSession);
+
+// Re-open closed session (admin)
+router.post('/session/reopen', attendanceController.reopenSession);
 
 
 // --- Attendance Signing Routes ---
