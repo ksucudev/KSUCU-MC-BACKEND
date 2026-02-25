@@ -68,7 +68,14 @@ exports.login = async (req, res) => {
     res.cookie('socket_token', token, socketCookieOptions);
 
     // Sending a success response
-    res.status(200).json({ message: 'Login successful' });
+    res.status(200).json({
+      message: 'Login successful',
+      user: {
+        _id: user._id,
+        username: user.username,
+        profilePhoto: user.profilePhoto
+      }
+    });
 
   } catch (error) {
     console.error('❌ Login error:', error);
@@ -248,7 +255,8 @@ exports.getUserData = async (req, res) => {
       reg: user.reg,
       et: user.et,
       course: user.course,
-      phone: user.phone
+      phone: user.phone,
+      profilePhoto: user.profilePhoto // Include profile photo URL
     };
     res.status(200).json(userData);
   } catch (error) {

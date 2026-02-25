@@ -20,7 +20,11 @@ const messageRoutes = require('./routes/messageRoutes')
 const pollingOfficerRoutes = require('./routes/pollingOfficerRoutes')
 const documentRoutes = require('./routes/documentRoutes')
 const minutesRoutes = require('./routes/minutesRoutes')
+<<<<<<< HEAD
 const ministryRegistrationRoutes = require('./routes/ministryRegistrationRoutes');
+=======
+const profilePhotoRoutes = require('./routes/profilePhotoRoutes')
+>>>>>>> 97dd4be84e4e9145c8f22535bbd8bfe6b84fbbb6
 require('dotenv').config();
 const fs = require('fs');
 const cors = require('cors')
@@ -102,7 +106,13 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-const dbUri = process.env.DB_CONNECTION_URI || 'mongodb://127.0.0.1:27017/ksucu-mc';
+let dbUri = process.env.DB_CONNECTION_URI || 'mongodb://127.0.0.1:27017/ksucu-mc';
+
+// Force 127.0.0.1 instead of localhost to avoid IPv6 issues (::1) in Node.js 18+
+if (dbUri.includes('localhost')) {
+  dbUri = dbUri.replace('localhost', '127.0.0.1');
+}
+
 console.log('Attempting to connect to MongoDB at:', dbUri);
 
 mongoose.connect(dbUri, {
@@ -133,7 +143,11 @@ app.use('/messages', messageRoutes);
 app.use('/polling-officer', pollingOfficerRoutes);
 app.use('/documents', documentRoutes);
 app.use('/minutes', minutesRoutes);
+<<<<<<< HEAD
 app.use('/api/ministry-registration', ministryRegistrationRoutes);
+=======
+app.use('/api/users', profilePhotoRoutes);
+>>>>>>> 97dd4be84e4e9145c8f22535bbd8bfe6b84fbbb6
 
 // Serve uploaded files statically with CORS headers
 const uploadsPath = path.join(__dirname, 'uploads');

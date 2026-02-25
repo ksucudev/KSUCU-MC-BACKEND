@@ -63,20 +63,24 @@ const requisitionController = {
   // Update requisition status
   updateStatus: async (req, res) => {
     try {
-      const { status, releasedBy, comments } = req.body;
+      const { status, releasedBy, comments, assetTransfer } = req.body;
       const updateData = { status };
-      
+
       if (status === 'released' && releasedBy) {
         updateData.releasedBy = releasedBy;
         updateData.releasedAt = new Date();
       }
-      
+
       if (status === 'returned') {
         updateData.returnedAt = new Date();
       }
-      
+
       if (comments) {
         updateData.comments = comments;
+      }
+
+      if (assetTransfer) {
+        updateData.assetTransfer = assetTransfer;
       }
 
       const updatedRequisition = await Requisition.findByIdAndUpdate(
@@ -99,8 +103,8 @@ const requisitionController = {
   // Approve requisition and send notification
   approveRequisition: async (req, res) => {
     try {
-      const { approvedBy, comments, approvalSignature } = req.body;
-      
+      const { approvedBy, comments, approvalSignature, assetTransfer } = req.body;
+
       const updateData = {
         status: 'approved',
         approvedBy: approvedBy || 'Admin',
@@ -112,6 +116,10 @@ const requisitionController = {
       if (approvalSignature) {
         updateData.approvalSignature = approvalSignature;
         updateData.approvalSignatureDate = new Date();
+      }
+
+      if (assetTransfer) {
+        updateData.assetTransfer = assetTransfer;
       }
 
       const updatedRequisition = await Requisition.findByIdAndUpdate(
@@ -127,7 +135,7 @@ const requisitionController = {
       // Send approval notification email
       try {
         await sendRequisitionApprovalEmail(updatedRequisition);
-        
+
         // Mark notification as sent
         updatedRequisition.notificationSent = true;
         await updatedRequisition.save();
@@ -151,18 +159,18 @@ const requisitionController = {
   generatePDF: async (req, res) => {
     try {
       const requisition = await Requisition.findById(req.params.id);
-      
+
       if (!requisition) {
         return res.status(404).json({ error: 'Requisition not found' });
       }
 
       // Get current user from request
       const currentUser = req.user?.name || req.user?.username || req.headers['x-user-name'];
-      const isAdmin = req.user?.role === 'admin' || req.sessionStore?.adminAuth === 'Overseer' || sessionStorage?.getItem('adminAuth') === 'Overseer';
+      const isAdmin = req.user?.role === 'admin' || req.sessionStore?.adminAuth === 'Overseer';
 
       // Check authorization: only admin or the requisition creator can generate PDF
       if (!isAdmin && currentUser !== requisition.recipientName) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Access denied',
           message: 'Only admins and the requisition creator can generate PDFs'
         });
@@ -209,16 +217,16 @@ const requisitionController = {
       doc.fontSize(11).font('Helvetica-Bold').fillColor('#730051').text('1. RECIPIENT INFORMATION', 40);
       doc.fillColor('black');
       doc.fontSize(9).font('Helvetica');
-      
+
       const col1X = 40;
       const col2X = 300;
-      
+
       doc.text('Full Name:', col1X);
       doc.fontSize(10).font('Helvetica-Bold').text(requisition.recipientName, col1X + 50);
       doc.fontSize(9).font('Helvetica');
       doc.text('Contact Phone:', col2X);
       doc.fontSize(10).font('Helvetica-Bold').text(requisition.recipientPhone, col2X + 70);
-      
+
       doc.moveDown(0.5);
       doc.fontSize(9).font('Helvetica').text('Purpose of Requisition:', col1X);
       doc.fontSize(10).font('Helvetica-Bold').text(requisition.purpose, col1X + 80);
@@ -239,7 +247,7 @@ const requisitionController = {
       // Table Header Background
       doc.rect(40, tableTop, 515, rowHeight).fillAndStroke('#730051', '#730051');
       doc.fillColor('white').fontSize(9).font('Helvetica-Bold');
-      
+
       tableHeaders.forEach((header, i) => {
         doc.text(header, colPositions[i] + 5, tableTop + 8, { width: colWidths[i] - 10 });
       });
@@ -247,7 +255,7 @@ const requisitionController = {
       // Table Rows
       let currentY = tableTop + rowHeight;
       doc.fillColor('black').font('Helvetica');
-      
+
       requisition.items.forEach((item, index) => {
         // Alternate row colors
         if (index % 2 === 0) {
@@ -275,13 +283,13 @@ const requisitionController = {
       doc.fontSize(11).font('Helvetica-Bold').fillColor('#730051').text('3. TIMELINE & FINANCIAL DETAILS', 40);
       doc.fillColor('black');
       doc.fontSize(9).font('Helvetica');
-      
+
       doc.text('Expected Time to Receive:', col1X);
       doc.fontSize(10).font('Helvetica-Bold').text(new Date(requisition.timeReceived).toLocaleString(), col1X + 130);
-      
+
       doc.fontSize(9).font('Helvetica').text('Expected Return Time:', col2X);
       doc.fontSize(10).font('Helvetica-Bold').text(new Date(requisition.timeToReturn).toLocaleString(), col2X + 120);
-      
+
       doc.moveDown(0.5);
       doc.fontSize(9).font('Helvetica').text('Total Amount (KES):', col1X);
       doc.fontSize(10).font('Helvetica-Bold').fillColor('#28a745').text(requisition.totalAmount.toString(), col1X + 90);
@@ -292,14 +300,14 @@ const requisitionController = {
       doc.fontSize(11).font('Helvetica-Bold').fillColor('#730051').text('4. APPROVAL STATUS', 40);
       doc.fillColor('black');
       doc.fontSize(9).font('Helvetica');
-      
-      const statusColor = requisition.status === 'approved' ? '#28a745' : 
-                         requisition.status === 'rejected' ? '#dc3545' :
-                         requisition.status === 'pending' ? '#ffc107' : '#6c757d';
-      
+
+      const statusColor = requisition.status === 'approved' ? '#28a745' :
+        requisition.status === 'rejected' ? '#dc3545' :
+          requisition.status === 'pending' ? '#ffc107' : '#6c757d';
+
       doc.fillColor(statusColor).font('Helvetica-Bold').text(`Status: ${requisition.status.toUpperCase()}`, col1X, doc.y);
       doc.fillColor('black').font('Helvetica');
-      
+
       if (requisition.approvedBy) {
         doc.moveDown(0.3);
         doc.text('Approved By:', col1X);
@@ -307,13 +315,13 @@ const requisitionController = {
         doc.fontSize(9).font('Helvetica').text('Approved Date:', col2X);
         doc.fontSize(10).font('Helvetica-Bold').text(new Date(requisition.approvedAt).toLocaleString(), col2X + 80);
       }
-      
+
       if (requisition.comments) {
         doc.moveDown(0.3);
         doc.fontSize(9).font('Helvetica').text('Admin Comments:', col1X);
         doc.fontSize(10).text(requisition.comments, col1X + 80, doc.y, { width: 400 });
       }
-      
+
       doc.moveDown(1);
 
       // SECTION 5: ADMIN APPROVAL SIGNATURE
@@ -419,7 +427,7 @@ const requisitionController = {
       doc.strokeColor('#730051').lineWidth(2);
       doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
       doc.strokeColor('black').lineWidth(1);
-      
+
       doc.fontSize(7).font('Helvetica').fillColor('#666666');
       doc.text('This document serves as official proof of requisition and asset transfer. All signatures are required for validity.', { align: 'center' });
       doc.text(`Generated: ${new Date().toLocaleString()} | KSUCU Missions & Community`, { align: 'center' });
@@ -457,18 +465,18 @@ const requisitionController = {
   getPDFInfo: async (req, res) => {
     try {
       const requisition = await Requisition.findById(req.params.id);
-      
+
       if (!requisition) {
         return res.status(404).json({ error: 'Requisition not found' });
       }
 
       // Get current user from request (should be set by auth middleware)
       const currentUser = req.user?.name || req.user?.username || req.headers['x-user-name'];
-      const isAdmin = req.user?.role === 'admin' || req.sessionStore?.adminAuth === 'Overseer' || sessionStorage?.getItem('adminAuth') === 'Overseer';
+      const isAdmin = req.user?.role === 'admin' || req.sessionStore?.adminAuth === 'Overseer';
 
       // Check authorization: only admin or the requisition creator can access
       if (!isAdmin && currentUser !== requisition.recipientName) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Access denied. Only admins and the requisition creator can view PDF information.',
           message: 'You do not have permission to view this requisition\'s PDFs'
         });
@@ -476,7 +484,7 @@ const requisitionController = {
 
       const uploadsDir = path.join(__dirname, '../uploads/requisitions');
       const requisitionId = requisition._id.toString();
-      
+
       let pdfVersions = [];
 
       // List all PDF files for this requisition
@@ -517,7 +525,7 @@ const requisitionController = {
   downloadPDF: async (req, res) => {
     try {
       const { file } = req.query;
-      
+
       if (!file) {
         return res.status(400).json({ error: 'File parameter is required' });
       }
@@ -539,11 +547,11 @@ const requisitionController = {
 
       // Get current user from request
       const currentUser = req.user?.name || req.user?.username || req.headers['x-user-name'];
-      const isAdmin = req.user?.role === 'admin' || req.sessionStore?.adminAuth === 'Overseer' || sessionStorage?.getItem('adminAuth') === 'Overseer';
+      const isAdmin = req.user?.role === 'admin' || req.sessionStore?.adminAuth === 'Overseer';
 
       // Check authorization: only admin or the requisition creator can download
       if (!isAdmin && currentUser !== requisition.recipientName) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Access denied',
           message: 'You do not have permission to download this requisition PDF'
         });

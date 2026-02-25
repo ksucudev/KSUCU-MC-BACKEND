@@ -155,7 +155,17 @@ async function fixDatabaseIndexes() {
 }
 
 // Run the fix when the model is loaded
-setTimeout(fixDatabaseIndexes, 2000); // Wait 2 seconds for DB connection
+const runIndexFix = async () => {
+    // If not connected, wait a bit and try again
+    if (mongoose.connection.readyState !== 1) {
+        console.log('Waiting for MongoDB connection before fixing indexes...');
+        setTimeout(runIndexFix, 5000);
+        return;
+    }
+    await fixDatabaseIndexes();
+};
+
+runIndexFix();
 
 module.exports = {
     AttendanceSession,
