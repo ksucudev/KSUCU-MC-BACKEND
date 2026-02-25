@@ -9,22 +9,34 @@ const MessageSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    category: {
+    ministryId: {
         type: String,
-        required: true,
-        enum: ['feedback', 'suggestion', 'complaint', 'praise', 'prayer', 'technical', 'other'],
-        default: 'feedback'
+        required: false // Optional for general feedback
     },
-    isAnonymous: {
-        type: Boolean,
-        required: true,
-        default: true
+    ministryName: {
+        type: String,
+        required: false
+    },
+    senderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: false // Optional for truly anonymous messages
+    },
+    assignedRole: {
+        type: String,
+        required: false // Mapped from ministryRoleMapping.js
     },
     senderInfo: {
         username: { type: String },
         email: { type: String },
         ministry: { type: String },
         yos: { type: Number }
+    },
+    replyText: {
+        type: String
+    },
+    repliedAt: {
+        type: Date
     },
     timestamp: {
         type: Date,

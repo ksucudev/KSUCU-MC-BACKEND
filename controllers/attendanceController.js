@@ -72,6 +72,7 @@ exports.endSession = async (req, res) => {
 exports.getSessionStatus = async (req, res) => {
     try {
         const includeInactive = req.query.all === 'true';
+        const requestedRole = req.query.role;
 
         // No-cache headers
         res.set({
@@ -90,9 +91,35 @@ exports.getSessionStatus = async (req, res) => {
 
         const sessions = await AttendanceSession.find(query).sort({ startTime: -1 });
 
+        // Logic for providing a singular "session" object as expected by the dashboard and sign-in components
+        let session = null;
+        let isOwnedByRequester = false;
+
+        if (sessions.length > 0) {
+            // Find active session for the role if requested
+            if (requestedRole) {
+                const ownedSession = sessions.find(s =>
+                    s.leadershipRole.trim().toLowerCase() === requestedRole.trim().toLowerCase()
+                );
+                if (ownedSession) {
+                    session = ownedSession;
+                    isOwnedByRequester = true;
+                } else if (!includeInactive) {
+                    // If requester has no active session, but there is ANY active session
+                    session = sessions[0];
+                    isOwnedByRequester = false;
+                }
+            } else {
+                // Generic view (sign-in)
+                session = sessions[0];
+            }
+        }
+
         res.json({
             message: sessions.length > 0 ? 'Sessions found' : 'No sessions found',
-            sessions
+            sessions,
+            session,
+            isOwnedByRequester
         });
 
     } catch (error) {
@@ -155,21 +182,23 @@ exports.getSessionByMinistry = async (req, res) => {
 // Anonymous attendance signing
 exports.signAnonymous = async (req, res) => {
     try {
-        let { sessionId, ministry, name, regNo, registrationNumber, year, course, phoneNumber, signature, userType } = req.body;
+        let { sessionId, ministry, name, regNo, registrationNumber, year, yos, course, phoneNumber, phone, signature, userType } = req.body;
 
-        // Support both field names for reg number
+        // Support both field names for reg number, year, and phone
         const effectiveRegNo = regNo || registrationNumber;
+        const effectiveYear = year || yos;
+        const effectivePhone = phoneNumber || phone;
 
         if (!sessionId || sessionId === 'null' || sessionId === 'undefined') {
             return res.status(400).json({ message: 'Invalid session ID' });
         }
 
         if (!name) {
-            return res.status(400).json({ message: 'Name is required' });
+            return res.status(400).json({ message: 'Full Name is required' });
         }
 
-        if (userType === 'student' && (!effectiveRegNo || !year || !course)) {
-            return res.status(400).json({ message: 'Students must provide reg number, year, and course' });
+        if (userType === 'student' && !effectiveRegNo) {
+            return res.status(400).json({ message: 'Registration number is required for students' });
         }
 
         const session = await AttendanceSession.findById(sessionId);
@@ -184,25 +213,29 @@ exports.signAnonymous = async (req, res) => {
 
         const regNoToCheck = (effectiveRegNo || 'N/A').trim().toUpperCase();
         console.log(`[signAnonymous] Signing for session: ${session.title} (${sessionId}), User: ${name}, RegNo: ${regNoToCheck}`);
-        const existingRecord = await AttendanceRecord.findOne({ sessionId, regNo: regNoToCheck });
 
-        if (existingRecord) {
-            return res.status(400).json({
-                message: `Registration number ${regNoToCheck} has already signed attendance for this session`
-            });
+        // Only check for duplicates if a registration number is provided
+        if (effectiveRegNo) {
+            const existingRecord = await AttendanceRecord.findOne({ sessionId, regNo: regNoToCheck });
+            if (existingRecord) {
+                return res.status(400).json({
+                    message: `Registration number ${regNoToCheck} has already signed attendance for this session`
+                });
+            }
         }
 
         const attendanceRecord = new AttendanceRecord({
             sessionId,
             userName: name.trim(),
             regNo: regNoToCheck,
-            year: parseInt(year) || 0,
+            year: parseInt(effectiveYear) || 0,
             course: course?.trim() || 'N/A',
             userType: userType || 'student',
-            ministry: ministry || 'General',
-            phoneNumber: phoneNumber?.trim() || '',
+            ministry: ministry || session.ministry || 'General',
+            phoneNumber: effectivePhone?.trim() || '',
             signature: signature || '',
-            signedAt: new Date()
+            signedAt: new Date(),
+            overseerId: session.openedBy // Link to the overseer who opened the session
         });
 
         await attendanceRecord.save();
@@ -354,27 +387,25 @@ exports.openSession = async (req, res) => {
             return res.status(400).json({ message: 'Session title is required' });
         }
 
-        // Allow multiple concurrent active sessions
-        // We removed the existingActiveSession check to support the user's requirement
+        // Close ALL existing active sessions for this role before opening a new one.
+        // This prevents "ghost" sessions from lingering when the overseer opens a fresh session.
+        const closed = await AttendanceSession.updateMany(
+            { leadershipRole: leadershipRole.trim(), isActive: true },
+            { isActive: false, endTime: new Date() }
+        );
+        if (closed.modifiedCount > 0) {
+            console.log(`[openSession] Closed ${closed.modifiedCount} stale active session(s) for role "${leadershipRole}" before opening a new one.`);
+        }
 
-        const mostRecentOwnSession = await AttendanceSession.findOne({ leadershipRole: leadershipRole.trim() })
-            .sort({ createdAt: -1 });
-
-        let session;
-        // If we found a recent session and want to "resume" it, we could, but usually 
-        // starting a new session means a fresh start. 
-        // For KSUCU-MC, it's safer to always create a new one to avoid ID confusion 
-        // unless there's a specific reason to resume.
-        // Actually, the previous code tried to reuse. Let's stick to creating new for better tracking.
-
-        session = new AttendanceSession({
+        const session = new AttendanceSession({
             title: title.trim(),
             ministry,
             leadershipRole: leadershipRole.trim(),
             durationMinutes: parseInt(durationMinutes) || 60,
             shortId: generateShortId(),
             isActive: true,
-            startTime: new Date()
+            startTime: new Date(),
+            openedBy: req.userId
         });
 
         await session.save();
@@ -390,7 +421,7 @@ exports.openSession = async (req, res) => {
 // Close session (admin)
 exports.closeSession = async (req, res) => {
     try {
-        const { sessionId, totalAttendees } = req.body;
+        const { sessionId, leadershipRole, totalAttendees } = req.body;
         if (!sessionId) {
             return res.status(400).json({ message: 'Session ID is required' });
         }
@@ -404,8 +435,20 @@ exports.closeSession = async (req, res) => {
         session.isActive = false;
         session.endTime = new Date();
         if (totalAttendees !== undefined) session.attendanceCount = totalAttendees;
-
         await session.save();
+
+        // Also close any OTHER lingering active sessions for the same role (safety net)
+        const roleToClose = leadershipRole || session.leadershipRole;
+        if (roleToClose) {
+            const extra = await AttendanceSession.updateMany(
+                { leadershipRole: roleToClose, isActive: true, _id: { $ne: session._id } },
+                { isActive: false, endTime: new Date() }
+            );
+            if (extra.modifiedCount > 0) {
+                console.log(`[closeSession] Closed ${extra.modifiedCount} extra stale session(s) for role "${roleToClose}".`);
+            }
+        }
+
         res.json({ message: 'Session closed successfully', session });
 
     } catch (error) {
@@ -413,6 +456,7 @@ exports.closeSession = async (req, res) => {
         res.status(500).json({ message: 'Error closing session', error: error.message });
     }
 };
+
 
 // Force close session
 exports.forceCloseSession = async (req, res) => {

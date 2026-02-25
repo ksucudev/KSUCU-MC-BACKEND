@@ -20,6 +20,7 @@ const messageRoutes = require('./routes/messageRoutes')
 const pollingOfficerRoutes = require('./routes/pollingOfficerRoutes')
 const documentRoutes = require('./routes/documentRoutes')
 const minutesRoutes = require('./routes/minutesRoutes')
+const ministryRegistrationRoutes = require('./routes/ministryRegistrationRoutes');
 require('dotenv').config();
 const fs = require('fs');
 const cors = require('cors')
@@ -132,6 +133,7 @@ app.use('/messages', messageRoutes);
 app.use('/polling-officer', pollingOfficerRoutes);
 app.use('/documents', documentRoutes);
 app.use('/minutes', minutesRoutes);
+app.use('/api/ministry-registration', ministryRegistrationRoutes);
 
 // Serve uploaded files statically with CORS headers
 const uploadsPath = path.join(__dirname, 'uploads');
@@ -144,7 +146,7 @@ app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
-  
+
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }

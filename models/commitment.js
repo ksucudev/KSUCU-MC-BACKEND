@@ -13,14 +13,16 @@ const CommitmentSchema = new mongoose.Schema({
   croppedImage: { type: String, required: false }, // Base64 or URL (optional)
   ministryLeader: { type: String, default: "Frank Waema" },
   dateApproved: { type: String, required: true },
-  status: { 
-    type: String, 
-    enum: ['pending', 'approved', 'revoked'], 
-    default: 'pending' 
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'revoked'],
+    default: 'pending'
   }, // Approval status
   submittedAt: { type: Date, default: Date.now }, // When form was submitted
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Admin who reviewed
-  reviewedAt: { type: Date } // When reviewed
+  reviewedAt: { type: Date }, // When reviewed
+  assigned_role: { type: String, required: true }, // Role that manages this
+  form_type: { type: String, enum: ['join', 'commitment'], default: 'commitment' }
 }, { timestamps: true });
 
 module.exports = mongoose.model("Commitment", CommitmentSchema);

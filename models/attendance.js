@@ -43,6 +43,11 @@ const attendanceSessionSchema = new mongoose.Schema({
     forcedClosedBy: {
         type: String,
         required: false
+    },
+    openedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: false // Should be set to req.user._id when opening
     }
 }, {
     timestamps: true
@@ -95,6 +100,11 @@ const attendanceRecordSchema = new mongoose.Schema({
     signedAt: {
         type: Date,
         default: Date.now
+    },
+    overseerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: false // Will be linked from the session during signing
     }
 }, {
     timestamps: true

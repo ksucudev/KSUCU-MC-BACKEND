@@ -5,15 +5,17 @@ const jwt = require('jsonwebtoken');
 
 // Middleware to verify JWT token specifically for attendance
 const verifyToken = (req, res, next) => {
-    const token = req.cookies.token;
+    const token = req.cookies.user_s; // Match userAuthMiddleware
 
     if (!token) {
         return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const secretKey = process.env.JWT_USER_SECRET; // Match userAuthMiddleware
+        const decoded = jwt.verify(token, secretKey);
         req.user = decoded;
+        req.userId = decoded.userId; // For compatibility
         next();
     } catch (error) {
         res.status(400).json({ message: 'Invalid token.' });
@@ -29,7 +31,7 @@ router.get('/session/status', attendanceController.getSessionStatus);
 router.get('/session/:ministry', attendanceController.getSessionByMinistry);
 
 // Open new session (admin)
-router.post('/session/open', attendanceController.openSession);
+router.post('/session/open', verifyToken, attendanceController.openSession);
 
 // Close active session (admin)
 router.post('/session/close', attendanceController.closeSession);
