@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema({
   et: { type: String },
   password: { type: String },
   profilePhoto: { type: String, default: null }, // URL path to profile photo
+  role: { type: String, enum: ['student', 'associate'], default: 'student' },
+  graduationYear: { type: Number, default: null },
   hasVoted: { type: Boolean, default: false },
   votedAt: { type: Date },
   votedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'PollingOfficer' },

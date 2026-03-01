@@ -20,11 +20,9 @@ const messageRoutes = require('./routes/messageRoutes')
 const pollingOfficerRoutes = require('./routes/pollingOfficerRoutes')
 const documentRoutes = require('./routes/documentRoutes')
 const minutesRoutes = require('./routes/minutesRoutes')
-<<<<<<< HEAD
 const ministryRegistrationRoutes = require('./routes/ministryRegistrationRoutes');
-=======
 const profilePhotoRoutes = require('./routes/profilePhotoRoutes')
->>>>>>> 97dd4be84e4e9145c8f22535bbd8bfe6b84fbbb6
+const overseerRoutes = require('./routes/overseerRoutes')
 require('dotenv').config();
 const fs = require('fs');
 const cors = require('cors')
@@ -143,11 +141,9 @@ app.use('/messages', messageRoutes);
 app.use('/polling-officer', pollingOfficerRoutes);
 app.use('/documents', documentRoutes);
 app.use('/minutes', minutesRoutes);
-<<<<<<< HEAD
 app.use('/api/ministry-registration', ministryRegistrationRoutes);
-=======
 app.use('/api/users', profilePhotoRoutes);
->>>>>>> 97dd4be84e4e9145c8f22535bbd8bfe6b84fbbb6
+app.use('/overseer', overseerRoutes);
 
 // Serve uploaded files statically with CORS headers
 const uploadsPath = path.join(__dirname, 'uploads');

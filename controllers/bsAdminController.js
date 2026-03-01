@@ -57,6 +57,10 @@ exports.login = async (req, res) => {
 
         const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production';
         
+        // Clear user session cookies to avoid conflicts
+        res.clearCookie('user_s');
+        res.clearCookie('socket_token');
+
         res.cookie('bs_token', token, {
             httpOnly: true,
             secure: !isDevelopment, // false in development, true in production

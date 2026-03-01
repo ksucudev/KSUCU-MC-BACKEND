@@ -58,6 +58,10 @@ exports.login = async (req, res) => {
 
         const token = jwt.sign({ userId: user._id }, process.env.JWT_ADMIN_SECRET, { expiresIn: '1h' });
 
+        // Clear user session cookies to avoid conflicts
+        res.clearCookie('user_s');
+        res.clearCookie('socket_token');
+
         res.cookie('sadmin_token', token, {
             httpOnly: true,
             secure: true,

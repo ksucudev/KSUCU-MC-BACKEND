@@ -41,13 +41,13 @@ exports.login = async (req, res) => {
       console.log('invalid pswd');
       return res.status(401).json({ message: 'Invalid username or password' });
     }
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_USER_SECRET, { expiresIn: '30d' }); // 30 days expiry
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_USER_SECRET, { expiresIn: '3d' });
 
     // Enhanced cookie settings for better cross-device compatibility
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds
+      maxAge: 3 * 24 * 60 * 60 * 1000, // 3 days in milliseconds
       sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
       // Add domain if in production for better cookie sharing
       ...(process.env.NODE_ENV === 'production' && { domain: '.ksucu-mc.co.ke' })
@@ -73,7 +73,8 @@ exports.login = async (req, res) => {
       user: {
         _id: user._id,
         username: user.username,
-        profilePhoto: user.profilePhoto
+        profilePhoto: user.profilePhoto,
+        role: user.role || 'student'
       }
     });
 
@@ -233,13 +234,13 @@ exports.getUserData = async (req, res) => {
     }
 
     // Generate fresh socket token for authenticated users
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_USER_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_USER_SECRET, { expiresIn: '3d' });
 
     // Set socket token cookie (accessible to JavaScript)
     const socketCookieOptions = {
       httpOnly: false, // Make accessible for socket auth
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 3 * 24 * 60 * 60 * 1000, // 3 days
       sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
       ...(process.env.NODE_ENV === 'production' && { domain: '.ksucu-mc.co.ke' })
     };
@@ -256,11 +257,39 @@ exports.getUserData = async (req, res) => {
       et: user.et,
       course: user.course,
       phone: user.phone,
-      profilePhoto: user.profilePhoto // Include profile photo URL
+      profilePhoto: user.profilePhoto,
+      role: user.role || 'student',
+      graduationYear: user.graduationYear || null
     };
     res.status(200).json(userData);
   } catch (error) {
     res.status(500).json({ message: error });
+  }
+};
+
+exports.verifyPassword = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { currentPassword } = req.body;
+
+    if (!currentPassword || currentPassword.trim() === '') {
+      return res.status(400).json({ message: 'Current password is required' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    res.status(200).json({ message: 'Password verified' });
+  } catch (error) {
+    console.log('Error verifying password:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -269,13 +298,58 @@ exports.updateUserData = async (req, res) => {
     const userId = req.userId; // Extract user ID from authentication middleware
 
     // Extract updated user details from request body
-    const { username, email, yos, ministry, reg, et, course, phone, password } = req.body;
+    const { username, email, yos, ministry, reg, et, course, phone, password, graduationYear } = req.body;
+
+    // Check for duplicate phone, email, or reg (excluding current user)
+    const duplicateChecks = [];
+    if (phone) duplicateChecks.push({ phone });
+    if (email) duplicateChecks.push({ email });
+    if (reg) duplicateChecks.push({ reg });
+
+    if (duplicateChecks.length > 0) {
+      const duplicate = await User.findOne({
+        _id: { $ne: userId },
+        $or: duplicateChecks
+      });
+
+      if (duplicate) {
+        if (duplicate.phone === phone) {
+          return res.status(400).json({ message: 'Phone number already in use by another account' });
+        }
+        if (duplicate.email === email) {
+          return res.status(400).json({ message: 'Email already in use by another account' });
+        }
+        if (reg && duplicate.reg === reg) {
+          return res.status(400).json({ message: 'Registration number already in use by another account' });
+        }
+      }
+    }
 
     // Prepare update data
     const updateData = { username, email, yos, ministry, reg, et, course, phone };
 
-    // If password is provided, hash it and include in update
+    // Include graduationYear if provided (for associates/alumni)
+    if (graduationYear !== undefined) {
+      updateData.graduationYear = graduationYear;
+    }
+
+    // If password is provided, verify old password first, then hash and update
     if (password && password.trim() !== '') {
+      const { currentPassword } = req.body;
+      if (!currentPassword || currentPassword.trim() === '') {
+        return res.status(400).json({ message: 'Current password is required to change password' });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(401).json({ message: 'Current password is incorrect' });
+      }
+
       console.log('Updating password for user:', userId);
       const hashedPassword = await bcrypt.hash(password, 10);
       updateData.password = hashedPassword;
@@ -438,11 +512,20 @@ exports.checkUserExists = async (req, res) => {
 // Self-registration for users (without admin)
 exports.signup = async (req, res) => {
   try {
-    let { username, email, phone, course, reg, yos, ministry, et } = req.body;
+    let { username, email, phone, course, reg, yos, ministry, et, role, graduationYear } = req.body;
 
-    // Validate required fields
-    if (!username || !email || !phone || !course || !reg || !yos || !ministry || !et) {
-      return res.status(400).json({ message: 'All fields are required' });
+    // Determine if this is an associate registration
+    const isAssociate = role === 'associate';
+
+    // Validate required fields (associates have fewer required fields)
+    if (isAssociate) {
+      if (!username || !email || !phone || !course) {
+        return res.status(400).json({ message: 'Name, email, phone and course are required' });
+      }
+    } else {
+      if (!username || !email || !phone || !course || !reg || !yos || !ministry || !et) {
+        return res.status(400).json({ message: 'All fields are required' });
+      }
     }
 
     // Normalize and clean data (remove extra spaces)
@@ -450,10 +533,13 @@ exports.signup = async (req, res) => {
     email = email.toLowerCase().trim();
     phone = phone.trim().replace(/\s+/g, '');
     course = course.trim().replace(/\s+/g, ' ');
-    reg = reg.trim().replace(/\s+/g, '');
-    yos = yos.toString().trim();
-    ministry = ministry.trim();
-    et = et.trim().toLowerCase();
+
+    if (!isAssociate) {
+      reg = reg.trim().replace(/\s+/g, '');
+      yos = yos.toString().trim();
+      ministry = ministry.trim();
+      et = et.trim().toLowerCase();
+    }
 
     // Validate phone format (10 digits starting with 0)
     const phoneRegex = /^0\d{9}$/;
@@ -461,14 +547,18 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ message: 'Phone number must be 10 digits starting with 0' });
     }
 
-    // Validate year of study (1-6)
-    const yosNum = parseInt(yos);
-    if (isNaN(yosNum) || yosNum < 1 || yosNum > 6) {
-      return res.status(400).json({ message: 'Year of study must be between 1 and 6' });
+    // Validate year of study (1-6) - only for students
+    if (!isAssociate) {
+      const yosNum = parseInt(yos);
+      if (isNaN(yosNum) || yosNum < 1 || yosNum > 6) {
+        return res.status(400).json({ message: 'Year of study must be between 1 and 6' });
+      }
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ $or: [{ email }, { phone }, { reg }] });
+    const orQuery = [{ email }, { phone }];
+    if (reg) orQuery.push({ reg });
+    const existingUser = await User.findOne({ $or: orQuery });
     if (existingUser) {
       if (existingUser.email === email) {
         return res.status(400).json({ message: 'Email already registered' });
@@ -476,7 +566,7 @@ exports.signup = async (req, res) => {
       if (existingUser.phone === phone) {
         return res.status(400).json({ message: 'Phone number already registered' });
       }
-      if (existingUser.reg === reg) {
+      if (reg && existingUser.reg === reg) {
         return res.status(400).json({ message: 'Registration number already registered' });
       }
     }
@@ -490,20 +580,22 @@ exports.signup = async (req, res) => {
       email,
       phone,
       course,
-      reg,
-      yos,
-      ministry,
-      et,
+      reg: isAssociate ? (reg || null) : reg,
+      yos: isAssociate ? null : yos,
+      ministry: isAssociate ? (ministry || 'alumni') : ministry,
+      et: isAssociate ? (et || 'none') : et,
+      role: isAssociate ? 'associate' : 'student',
+      graduationYear: isAssociate ? (parseInt(graduationYear) || null) : null,
       password: hashedPassword
     });
 
     await newUser.save();
 
-    console.log('New user self-registered:', {
+    console.log(`New ${isAssociate ? 'associate' : 'student'} self-registered:`, {
       username,
       email,
       phone,
-      reg
+      reg: reg || 'N/A'
     });
 
     res.status(201).json({
@@ -544,5 +636,58 @@ exports.searchUsers = async (req, res) => {
   } catch (error) {
     console.error('Error searching users:', error);
     res.status(500).json({ message: 'Error searching users' });
+  }
+};
+
+// Advance all students by one academic year (super admin only)
+exports.advanceYears = async (req, res) => {
+  try {
+    const students = await User.find({ role: { $ne: 'associate' } });
+
+    let advanced = 0;
+    let promoted = 0;
+    let skipped = 0;
+
+    for (const student of students) {
+      const currentYos = parseInt(student.yos);
+      if (isNaN(currentYos)) {
+        skipped++;
+        continue;
+      }
+
+      // Check if medical student (course contains 'medicine' or 'medical')
+      const isMedical = student.course &&
+        (student.course.toLowerCase().includes('medicine') ||
+         student.course.toLowerCase().includes('medical'));
+
+      const maxYear = isMedical ? 6 : 4;
+
+      if (currentYos >= maxYear) {
+        // Promote to associate
+        student.role = 'associate';
+        student.graduationYear = new Date().getFullYear();
+        student.yos = null;
+        promoted++;
+      } else {
+        // Advance year
+        student.yos = (currentYos + 1).toString();
+        advanced++;
+      }
+
+      await student.save();
+    }
+
+    console.log(`Year advancement complete: ${advanced} advanced, ${promoted} promoted, ${skipped} skipped`);
+
+    res.status(200).json({
+      message: 'Year advancement complete',
+      advanced,
+      promoted,
+      skipped,
+      total: students.length
+    });
+  } catch (error) {
+    console.error('Year advancement error:', error);
+    res.status(500).json({ message: 'Error during year advancement' });
   }
 };
