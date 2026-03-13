@@ -107,7 +107,7 @@ exports.admitUser = async (req, res) => {
 // Get all users for management
 exports.getAllUsers = async (req, res) => {
     try {
-        const users = await User.find({}, 'username email phone course reg yos et ministry').sort({ username: 1 });
+        const users = await User.find({}, 'username email phone course reg yos et ministry profilePhoto').sort({ username: 1 });
         res.status(200).json(users);
     } catch (error) {
         console.log('Error fetching users:', error);
@@ -134,7 +134,7 @@ exports.resetUserPassword = async (req, res) => {
         );
 
         if (!updatedUser) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ message: 'User found' });
         }
 
         console.log(`Password reset for user ${updatedUser.username} (${updatedUser.email}) to: ${newPassword}`);
@@ -146,6 +146,67 @@ exports.resetUserPassword = async (req, res) => {
     } catch (error) {
         console.log('Error resetting password:', error);
         res.status(500).json({ message: 'Error resetting password', error });
+    }
+};
+
+// Update user details (Admission Admin only)
+exports.updateUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { username, email, phone, course, reg, yos, et, ministry } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({ message: 'User ID is required' });
+        }
+
+        // Validate required fields
+        if (!username || !email || !phone || !reg) {
+            return res.status(400).json({ message: 'Name, Email, Phone, and REG number are required' });
+        }
+
+        // Check if email/phone/reg already exists for other users
+        const existingUser = await User.findOne({
+            _id: { $ne: userId },
+            $or: [{ email: email.toLowerCase() }, { phone }, { reg }]
+        });
+
+        if (existingUser) {
+            let conflictField = '';
+            if (existingUser.email === email.toLowerCase()) conflictField = 'Email';
+            else if (existingUser.phone === phone) conflictField = 'Phone';
+            else if (existingUser.reg === reg) conflictField = 'REG number';
+            
+            return res.status(400).json({ message: `${conflictField} already exists for another user` });
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                username,
+                email: email.toLowerCase(),
+                phone,
+                course,
+                reg,
+                yos,
+                et,
+                ministry
+            },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        console.log(`User details updated by admin: ${updatedUser.username} (${updatedUser.email})`);
+        
+        res.status(200).json({ 
+            message: 'User details updated successfully!',
+            user: updatedUser
+        });
+    } catch (error) {
+        console.log('Error updating user:', error);
+        res.status(500).json({ message: 'Error updating user details', error: error.message });
     }
 };
 
