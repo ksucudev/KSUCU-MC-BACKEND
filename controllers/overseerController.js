@@ -31,11 +31,12 @@ exports.login = async (req, res) => {
     res.clearCookie('user_s');
     res.clearCookie('socket_token');
 
+    const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('overseer_token', token, {
       httpOnly: true,
-      secure: true,
+      secure: isProduction,
       maxAge: 4 * 60 * 60 * 1000,
-      sameSite: 'None',
+      sameSite: isProduction ? 'None' : 'Lax',
     });
 
     res.status(200).json({ message: 'Login successful' });
@@ -52,10 +53,11 @@ exports.verify = (req, res) => {
 
 // Logout
 exports.logout = (req, res) => {
+  const isProduction = process.env.NODE_ENV === 'production';
   res.clearCookie('overseer_token', {
     httpOnly: true,
-    secure: true,
-    sameSite: 'None'
+    secure: isProduction,
+    sameSite: isProduction ? 'None' : 'Lax'
   });
   res.status(200).json({ message: 'Logout successful' });
 };

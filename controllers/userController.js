@@ -466,6 +466,8 @@ exports.checkUserExists = async (req, res) => {
   try {
     let { email, phone, regNo } = req.body;
 
+    console.log('🔍 checkUserExists called with:', { email, phone, regNo });
+
     if (!email && !phone && !regNo) {
       return res.status(400).json({ message: 'Email, phone or registration number is required' });
     }
@@ -475,13 +477,27 @@ exports.checkUserExists = async (req, res) => {
     if (phone) phone = phone.trim();
     if (regNo) regNo = regNo.trim().toUpperCase();
 
-    // Check if user exists by email, phone, or regNo
+    // Build search query
     const query = [];
     if (email) query.push({ email });
-    if (phone) query.push({ phone });
-    if (regNo) query.push({ reg: regNo }); // Field in model is 'reg'
+    if (phone) {
+      // Try exact match AND flexible match (last 9 digits) to handle format differences
+      const digits = phone.replace(/\D/g, ''); // strip non-digits
+      if (digits.length >= 9) {
+        const last9 = digits.slice(-9);
+        query.push({ phone });
+        query.push({ phone: { $regex: last9 + '$' } }); // match ending with last 9 digits
+      } else {
+        query.push({ phone });
+      }
+    }
+    if (regNo) query.push({ reg: regNo });
+
+    console.log('🔍 Search query:', JSON.stringify(query));
 
     const user = await User.findOne({ $or: query });
+
+    console.log('🔍 User found:', user ? user.username : 'NOT FOUND');
 
     if (user) {
       return res.status(200).json({
