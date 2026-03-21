@@ -6,7 +6,12 @@ exports.login = async (req, res) => {
   try {
     const { password } = req.body;
 
+    console.log('[Overseer Login] Attempt received. Password length:', password ? password.length : 'NO PASSWORD');
+    console.log('[Overseer Login] Request body keys:', Object.keys(req.body));
+    console.log('[Overseer Login] Content-Type:', req.headers['content-type']);
+
     if (!password) {
+      console.log('[Overseer Login] REJECTED: No password provided');
       return res.status(400).json({ message: 'Password is required' });
     }
 
@@ -16,7 +21,9 @@ exports.login = async (req, res) => {
       return res.status(500).json({ message: 'Server configuration error' });
     }
 
+    console.log('[Overseer Login] Hash present, comparing...');
     const isValid = await bcrypt.compare(password, storedHash);
+    console.log('[Overseer Login] bcrypt.compare result:', isValid);
     if (!isValid) {
       return res.status(401).json({ message: 'Invalid password' });
     }
