@@ -23,6 +23,7 @@ const minutesRoutes = require('./routes/minutesRoutes')
 const ministryRegistrationRoutes = require('./routes/ministryRegistrationRoutes');
 const profilePhotoRoutes = require('./routes/profilePhotoRoutes')
 const overseerRoutes = require('./routes/overseerRoutes')
+const patronRoutes = require('./routes/patronRoutes')
 require('dotenv').config();
 const fs = require('fs');
 const cors = require('cors')
@@ -144,6 +145,7 @@ app.use('/minutes', minutesRoutes);
 app.use('/api/ministry-registration', ministryRegistrationRoutes);
 app.use('/api/users', profilePhotoRoutes);
 app.use('/overseer', overseerRoutes);
+app.use('/patron', patronRoutes);
 
 // Serve uploaded files statically with CORS headers
 const uploadsPath = path.join(__dirname, 'uploads');
