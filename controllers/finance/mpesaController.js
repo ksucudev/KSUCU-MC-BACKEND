@@ -30,7 +30,7 @@ exports.memberPayment = async (req, res) => {
     if (amount < 1 || amount > 150000) {
       return res.status(400).json({ message: 'Amount must be between KES 1 and KES 150,000.' });
     }
-    const validCategories = ['offering', 'tithe', 'project', 'other'];
+    const validCategories = ['offering', 'tithe', 'thanksgiving'];
     const cat = validCategories.includes(category) ? category : 'offering';
     const result = await mpesaService.stkPush({
       phone,

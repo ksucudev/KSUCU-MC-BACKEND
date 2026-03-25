@@ -1,3 +1,5 @@
+const https = require('https');
+
 class MpesaService {
   constructor() {
     this.consumerKey = process.env.MPESA_CONSUMER_KEY;
@@ -5,18 +7,40 @@ class MpesaService {
     this.shortcode = process.env.MPESA_SHORTCODE;
     this.passkey = process.env.MPESA_PASSKEY;
     this.callbackUrl = process.env.MPESA_CALLBACK_URL;
-    this.baseUrl = 'https://api.safaricom.co.ke';
+    this.baseUrl = 'api.safaricom.co.ke';
+  }
+
+  _request(options, postData) {
+    return new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => {
+          try {
+            resolve({ status: res.statusCode, data: JSON.parse(body) });
+          } catch {
+            reject(new Error(`Invalid JSON response: ${body}`));
+          }
+        });
+      });
+      req.on('error', reject);
+      if (postData) req.write(postData);
+      req.end();
+    });
   }
 
   async getAccessToken() {
     const credentials = Buffer.from(`${this.consumerKey}:${this.consumerSecret}`).toString('base64');
-    const response = await fetch(
-      `${this.baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
-      { method: 'POST', headers: { Authorization: `Basic ${credentials}` } }
-    );
-    if (!response.ok) throw new Error(`Failed to get M-Pesa access token: ${response.statusText}`);
-    const data = await response.json();
-    return data.access_token;
+    const res = await this._request({
+      hostname: this.baseUrl,
+      path: '/oauth/v1/generate?grant_type=client_credentials',
+      method: 'GET',
+      headers: { Authorization: `Basic ${credentials}` },
+    });
+    if (!res.data.access_token) {
+      throw new Error(`Failed to get M-Pesa access token: ${JSON.stringify(res.data)}`);
+    }
+    return res.data.access_token;
   }
 
   async stkPush({ phone, amount, accountReference, transactionDesc }) {
@@ -24,24 +48,32 @@ class MpesaService {
     const timestamp = this.getTimestamp();
     const password = Buffer.from(`${this.shortcode}${this.passkey}${timestamp}`).toString('base64');
     const formattedPhone = this.formatPhoneNumber(phone);
-    const response = await fetch(
-      `${this.baseUrl}/mpesa/stkpush/v1/processrequest`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          BusinessShortCode: this.shortcode, Password: password, Timestamp: timestamp,
-          TransactionType: 'CustomerPayBillOnline', Amount: Math.round(amount),
-          PartyA: formattedPhone, PartyB: this.shortcode, PhoneNumber: formattedPhone,
-          CallBackURL: this.callbackUrl, AccountReference: accountReference, TransactionDesc: transactionDesc,
-        }),
-      }
-    );
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`M-Pesa STK push failed: ${errorData}`);
+    const payload = JSON.stringify({
+      BusinessShortCode: this.shortcode,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: Math.round(amount),
+      PartyA: formattedPhone,
+      PartyB: this.shortcode,
+      PhoneNumber: formattedPhone,
+      CallBackURL: this.callbackUrl,
+      AccountReference: accountReference,
+      TransactionDesc: transactionDesc,
+    });
+    const res = await this._request({
+      hostname: this.baseUrl,
+      path: '/mpesa/stkpush/v1/processrequest',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }, payload);
+    if (res.status !== 200 || res.data.errorCode) {
+      throw new Error(`M-Pesa STK push failed: ${JSON.stringify(res.data)}`);
     }
-    return await response.json();
+    return res.data;
   }
 
   formatPhoneNumber(phone) {
