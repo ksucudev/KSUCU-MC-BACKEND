@@ -11,8 +11,8 @@ exports.initiatePayment = async (req, res) => {
     const result = await mpesaService.stkPush({
       phone,
       amount: Math.round(amount),
-      accountReference: 'CUFinance',
-      transactionDesc: `CU ${category || 'contribution'} payment`,
+      accountReference: (category || 'Offering').charAt(0).toUpperCase() + (category || 'offering').slice(1),
+      transactionDesc: `CU ${category || 'offering'} payment`,
     });
     res.json({ message: 'STK push sent. Check your phone.', data: result });
   } catch (err) {
@@ -35,7 +35,7 @@ exports.memberPayment = async (req, res) => {
     const result = await mpesaService.stkPush({
       phone,
       amount: Math.round(amount),
-      accountReference: 'KSUCU-MC',
+      accountReference: cat.charAt(0).toUpperCase() + cat.slice(1),
       transactionDesc: `KSUCU ${cat} contribution`,
     });
     res.json({ message: 'STK push sent. Check your phone to complete payment.', data: result });
