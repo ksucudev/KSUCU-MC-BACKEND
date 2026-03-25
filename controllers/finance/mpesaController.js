@@ -52,14 +52,23 @@ exports.checkStatus = async (req, res) => {
       return res.status(400).json({ message: 'CheckoutRequestID is required.' });
     }
     const result = await mpesaService.stkQuery(checkoutRequestID);
+    const raw = JSON.stringify(result);
 
-    // Safaricom returns errorCode when still processing
-    if (result.errorCode) {
+    // Still processing — Safaricom returns errorCode or errorMessage or "processing" text
+    if (result.errorCode || result.errorMessage || raw.toLowerCase().includes('process')) {
       return res.json({ status: 'pending', message: 'Payment is being processed...' });
     }
 
-    // ResultCode can be string or number
+    // Has a ResultCode — payment resolved
+    if (result.ResultCode === undefined && result.ResultCode === null) {
+      return res.json({ status: 'pending', message: 'Payment is being processed...' });
+    }
+
     const code = Number(result.ResultCode);
+    if (isNaN(code)) {
+      return res.json({ status: 'pending', message: 'Payment is being processed...' });
+    }
+
     let status, message;
     if (code === 0) {
       status = 'success';
@@ -76,15 +85,13 @@ exports.checkStatus = async (req, res) => {
     } else if (code === 2001) {
       status = 'failed';
       message = 'Wrong M-Pesa PIN entered.';
-    } else if (isNaN(code)) {
-      status = 'pending';
-      message = 'Payment is being processed...';
     } else {
       status = 'failed';
       message = result.ResultDesc || 'Payment failed. Please try again.';
     }
     res.json({ status, message, resultCode: code });
   } catch (err) {
+    // Any error during query means still processing
     res.json({ status: 'pending', message: 'Payment is being processed...' });
   }
 };
