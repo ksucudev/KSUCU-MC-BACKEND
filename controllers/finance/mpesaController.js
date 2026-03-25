@@ -52,35 +52,40 @@ exports.checkStatus = async (req, res) => {
       return res.status(400).json({ message: 'CheckoutRequestID is required.' });
     }
     const result = await mpesaService.stkQuery(checkoutRequestID);
-    // ResultCode: 0 = success, 1032 = cancelled, 1037 = timeout, 1 = insufficient funds
-    const code = result.ResultCode;
+
+    // Safaricom returns errorCode when still processing
+    if (result.errorCode) {
+      return res.json({ status: 'pending', message: 'Payment is being processed...' });
+    }
+
+    // ResultCode can be string or number
+    const code = Number(result.ResultCode);
     let status, message;
-    if (code === undefined || code === null) {
-      status = 'pending';
-      message = 'Payment is being processed...';
-    } else if (code === 0) {
+    if (code === 0) {
       status = 'success';
       message = 'Payment completed successfully!';
     } else if (code === 1032) {
       status = 'cancelled';
-      message = 'Payment was cancelled.';
+      message = 'You cancelled the payment. You can try again when ready.';
     } else if (code === 1037) {
       status = 'timeout';
-      message = 'Payment request timed out. Please try again.';
+      message = 'The payment request timed out. Please try again.';
     } else if (code === 1) {
       status = 'failed';
-      message = 'Insufficient funds.';
+      message = 'Insufficient funds in your M-Pesa account.';
+    } else if (code === 2001) {
+      status = 'failed';
+      message = 'Wrong M-Pesa PIN entered.';
+    } else if (isNaN(code)) {
+      status = 'pending';
+      message = 'Payment is being processed...';
     } else {
       status = 'failed';
-      message = result.ResultDesc || 'Payment failed.';
+      message = result.ResultDesc || 'Payment failed. Please try again.';
     }
     res.json({ status, message, resultCode: code });
   } catch (err) {
-    // If query fails with "The transaction is being processed", it's still pending
-    if (err.message && err.message.includes('being processed')) {
-      return res.json({ status: 'pending', message: 'Payment is being processed...' });
-    }
-    res.json({ status: 'pending', message: 'Checking payment status...' });
+    res.json({ status: 'pending', message: 'Payment is being processed...' });
   }
 };
 
@@ -90,7 +95,9 @@ exports.callback = async (req, res) => {
     if (!Body || !Body.stkCallback) {
       return res.status(400).json({ message: 'Invalid callback.' });
     }
-    const { ResultCode, ResultDesc, CallbackMetadata } = Body.stkCallback;
+    const { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = Body.stkCallback;
+    const io = req.app.get('io');
+
     if (ResultCode === 0 && CallbackMetadata) {
       const items = CallbackMetadata.Item;
       const getValue = (name) => items.find(i => i.Name === name)?.Value;
@@ -106,8 +113,12 @@ exports.callback = async (req, res) => {
         description: `M-Pesa payment ${mpesaCode}`,
       });
       console.log(`M-Pesa payment received: ${mpesaCode}, KES ${amount}`);
+      if (io) io.emit('mpesa-payment-result', { checkoutRequestID: CheckoutRequestID, status: 'success', message: 'Payment completed successfully!' });
     } else {
       console.log(`M-Pesa payment failed: ${ResultDesc}`);
+      const status = ResultCode === 1032 ? 'cancelled' : ResultCode === 1037 ? 'timeout' : 'failed';
+      const message = ResultCode === 1032 ? 'You cancelled the payment.' : ResultCode === 1037 ? 'Payment request timed out.' : ResultDesc || 'Payment failed.';
+      if (io) io.emit('mpesa-payment-result', { checkoutRequestID: CheckoutRequestID, status, message });
     }
     res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
   } catch (err) {
