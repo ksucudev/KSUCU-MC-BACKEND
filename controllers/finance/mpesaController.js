@@ -20,6 +20,30 @@ exports.initiatePayment = async (req, res) => {
   }
 };
 
+// Member-facing STK push (authenticated via user_s cookie)
+exports.memberPayment = async (req, res) => {
+  try {
+    const { phone, amount, category } = req.body;
+    if (!phone || !amount) {
+      return res.status(400).json({ message: 'Phone number and amount are required.' });
+    }
+    if (amount < 1 || amount > 150000) {
+      return res.status(400).json({ message: 'Amount must be between KES 1 and KES 150,000.' });
+    }
+    const validCategories = ['offering', 'tithe', 'project', 'other'];
+    const cat = validCategories.includes(category) ? category : 'offering';
+    const result = await mpesaService.stkPush({
+      phone,
+      amount: Math.round(amount),
+      accountReference: 'KSUCU-MC',
+      transactionDesc: `KSUCU ${cat} contribution`,
+    });
+    res.json({ message: 'STK push sent. Check your phone to complete payment.', data: result });
+  } catch (err) {
+    res.status(500).json({ message: 'M-Pesa request failed. Please try again.', error: err.message });
+  }
+};
+
 exports.callback = async (req, res) => {
   try {
     const { Body } = req.body;
