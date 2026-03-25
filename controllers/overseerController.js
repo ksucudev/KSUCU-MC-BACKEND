@@ -2,23 +2,29 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Overseer = require('../models/overseer');
 
-// Login with email and password
+// Login with password (legacy) or email+password
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required' });
     }
 
-    const overseer = await Overseer.findOne({ email: email.toLowerCase() });
+    // If email provided, find by email. Otherwise find the single overseer.
+    let overseer;
+    if (email) {
+      overseer = await Overseer.findOne({ email: email.toLowerCase() });
+    } else {
+      overseer = await Overseer.findOne();
+    }
     if (!overseer) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: 'Incorrect email or password, please enter correct details.' });
     }
 
     const isValid = await bcrypt.compare(password, overseer.password);
     if (!isValid) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: 'Incorrect email or password, please enter correct details.' });
     }
 
     const token = jwt.sign(
