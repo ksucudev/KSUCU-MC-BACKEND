@@ -2,6 +2,9 @@ const mpesaService = require('../../services/mpesaService');
 const Transaction = require('../../models/financeTransaction');
 const { logFinanceAction } = require('../../middlewares/financeAudit');
 
+// In-memory map of CheckoutRequestID → { userId, category } for linking callbacks to users
+const pendingPayments = new Map();
+
 exports.initiatePayment = async (req, res) => {
   try {
     const { phone, amount, category } = req.body;
@@ -38,6 +41,12 @@ exports.memberPayment = async (req, res) => {
       accountReference: cat.charAt(0).toUpperCase() + cat.slice(1),
       transactionDesc: `KSUCU ${cat} contribution`,
     });
+    // Store user ID and category so callback can link the payment
+    if (result.CheckoutRequestID && req.user) {
+      pendingPayments.set(result.CheckoutRequestID, { userId: req.user.id, category: cat });
+      // Auto-clean after 5 minutes
+      setTimeout(() => pendingPayments.delete(result.CheckoutRequestID), 300000);
+    }
     res.json({ message: 'STK push sent. Check your phone to complete payment.', data: result });
   } catch (err) {
     res.status(500).json({ message: 'M-Pesa request failed. Please try again.', error: err.message });
@@ -116,14 +125,19 @@ exports.callback = async (req, res) => {
       const amount = getValue('Amount');
       const mpesaCode = getValue('MpesaReceiptNumber');
       const phone = getValue('PhoneNumber');
-      await Transaction.create({
+      // Get stored user info from pending map
+      const pending = pendingPayments.get(CheckoutRequestID);
+      const txData = {
         type: 'cash_in',
-        category: 'offering',
+        category: pending?.category || 'offering',
         amount,
         source: 'mpesa',
         phone: String(phone),
         description: `M-Pesa payment ${mpesaCode}`,
-      });
+      };
+      if (pending?.userId) txData.recorded_by = pending.userId;
+      await Transaction.create(txData);
+      if (pending) pendingPayments.delete(CheckoutRequestID);
       console.log(`M-Pesa payment received: ${mpesaCode}, KES ${amount}`);
       if (io) io.emit('mpesa-payment-result', { checkoutRequestID: CheckoutRequestID, status: 'success', message: 'Payment completed successfully!' });
     } else {
