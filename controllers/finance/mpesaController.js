@@ -63,6 +63,12 @@ exports.checkStatus = async (req, res) => {
       return res.json({ status: 'pending', message: 'Payment is being processed...' });
     }
 
+    // If ResultDesc mentions processing, it's still pending
+    const desc = (result.ResultDesc || '').toLowerCase();
+    if (desc.includes('processing') || desc.includes('being processed')) {
+      return res.json({ status: 'pending', message: 'Payment is being processed...' });
+    }
+
     const code = Number(result.ResultCode);
     if (isNaN(code)) {
       return res.json({ status: 'pending', message: 'Payment is being processed...' });
