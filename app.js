@@ -147,6 +147,9 @@ app.use('/api/users', profilePhotoRoutes);
 app.use('/overseer', overseerRoutes);
 app.use('/patron', patronRoutes);
 
+// Finance API routes
+app.use('/api/finance', require('./routes/finance/index'));
+
 // Serve uploaded files statically with CORS headers
 const uploadsPath = path.join(__dirname, 'uploads');
 console.log('📁 Static files: Serving uploads from:', uploadsPath);

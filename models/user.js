@@ -16,7 +16,12 @@ const userSchema = new mongoose.Schema({
   hasVoted: { type: Boolean, default: false },
   votedAt: { type: Date },
   votedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'PollingOfficer' },
-  registeredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'PollingOfficer' }
+  registeredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'PollingOfficer' },
+  financeRole: {
+    type: String,
+    enum: ['treasurer', 'auditor', 'chair_accounts', 'chairperson', null],
+    default: null
+  }
 });
 
 module.exports = mongoose.model('User', userSchema);
