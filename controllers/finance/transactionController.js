@@ -49,10 +49,26 @@ exports.getById = async (req, res) => {
 
 exports.getMyContributions = async (req, res) => {
   try {
-    const transactions = await Transaction.find({
-      type: "cash_in",
-      recorded_by: req.user.id,
-    }).sort({ createdAt: -1 });
+    // Match by user ID or by phone number (for M-Pesa payments)
+    const User = require("../../models/user");
+    const user = await User.findById(req.user.id).select("phone");
+    const query = { type: "cash_in" };
+
+    if (user && user.phone) {
+      // Format phone to 254... to match M-Pesa format
+      let phone254 = user.phone.replace(/\s+/g, '');
+      if (phone254.startsWith('0')) phone254 = '254' + phone254.substring(1);
+      else if (phone254.startsWith('+')) phone254 = phone254.substring(1);
+      query.$or = [
+        { recorded_by: req.user.id },
+        { phone: phone254 },
+        { phone: user.phone },
+      ];
+    } else {
+      query.recorded_by = req.user.id;
+    }
+
+    const transactions = await Transaction.find(query).sort({ createdAt: -1 });
     res.json(transactions);
   } catch (err) {
     res.status(500).json({ message: "Server error.", error: err.message });
