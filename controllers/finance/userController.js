@@ -44,6 +44,31 @@ exports.create = async (req, res) => {
   }
 };
 
+exports.resetPassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters." });
+    }
+
+    const user = await FinanceUser.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "Finance user not found." });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    await user.save();
+
+    await logFinanceAction(req.user.id, "reset_finance_password", "finance_users", req.params.id, {
+      email: user.email,
+    });
+
+    res.json({ message: `Password reset for ${user.email}.` });
+  } catch (err) {
+    res.status(500).json({ message: "Server error.", error: err.message });
+  }
+};
+
 exports.deleteUser = async (req, res) => {
   try {
     const user = await FinanceUser.findByIdAndDelete(req.params.id);
