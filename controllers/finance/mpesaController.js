@@ -52,15 +52,14 @@ exports.checkStatus = async (req, res) => {
       return res.status(400).json({ message: 'CheckoutRequestID is required.' });
     }
     const result = await mpesaService.stkQuery(checkoutRequestID);
-    const raw = JSON.stringify(result);
 
-    // Still processing — Safaricom returns errorCode or errorMessage or "processing" text
-    if (result.errorCode || result.errorMessage || raw.toLowerCase().includes('process')) {
+    // Still processing — Safaricom returns errorCode/errorMessage when not yet resolved
+    if (result.errorCode || result.errorMessage) {
       return res.json({ status: 'pending', message: 'Payment is being processed...' });
     }
 
-    // Has a ResultCode — payment resolved
-    if (result.ResultCode === undefined && result.ResultCode === null) {
+    // No ResultCode means still processing
+    if (result.ResultCode === undefined || result.ResultCode === null) {
       return res.json({ status: 'pending', message: 'Payment is being processed...' });
     }
 
