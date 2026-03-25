@@ -4,7 +4,7 @@ const { logFinanceAction } = require("../../middlewares/financeAudit");
 
 exports.getAll = async (req, res) => {
   try {
-    const users = await FinanceUser.find()
+    const users = await FinanceUser.find({ role: { $in: ['treasurer', 'chair_accounts', 'auditor'] } })
       .select("-password")
       .sort({ role: 1 });
     res.json(users);
@@ -16,6 +16,11 @@ exports.getAll = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const { name, email, password, role, phone } = req.body;
+
+    const validRoles = ["treasurer", "chair_accounts", "auditor"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: `Invalid role. Must be one of: ${validRoles.join(", ")}` });
+    }
 
     const existing = await FinanceUser.findOne({ email });
     if (existing) {

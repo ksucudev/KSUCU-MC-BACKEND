@@ -5,21 +5,6 @@ const Users = require('../models/user');
 const Message = require('../models/message');
 const MediaItem = require('../models/MediaItem');
 
-// Default patron credentials
-const DEFAULT_PATRON_EMAIL = 'patron@ksucu-mc.co.ke';
-const DEFAULT_PATRON_PASSWORD = 'Patron@Patron';
-
-// Auto-seed patron if not exists
-const ensurePatronExists = async () => {
-    const existing = await Patron.findOne({ email: DEFAULT_PATRON_EMAIL });
-    if (!existing) {
-        const hashedPassword = await bcrypt.hash(DEFAULT_PATRON_PASSWORD, 10);
-        const patron = new Patron({ email: DEFAULT_PATRON_EMAIL, password: hashedPassword });
-        await patron.save();
-        console.log('Patron account created successfully');
-    }
-};
-
 // Login
 exports.login = async (req, res) => {
     try {
@@ -29,9 +14,6 @@ exports.login = async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
-
-        // Auto-seed on first login attempt
-        await ensurePatronExists();
 
         const patron = await Patron.findOne({ email: email.toLowerCase() });
         if (!patron) {
