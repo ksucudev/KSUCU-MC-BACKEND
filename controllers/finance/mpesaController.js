@@ -44,6 +44,46 @@ exports.memberPayment = async (req, res) => {
   }
 };
 
+// Check STK push payment status
+exports.checkStatus = async (req, res) => {
+  try {
+    const { checkoutRequestID } = req.params;
+    if (!checkoutRequestID) {
+      return res.status(400).json({ message: 'CheckoutRequestID is required.' });
+    }
+    const result = await mpesaService.stkQuery(checkoutRequestID);
+    // ResultCode: 0 = success, 1032 = cancelled, 1037 = timeout, 1 = insufficient funds
+    const code = result.ResultCode;
+    let status, message;
+    if (code === undefined || code === null) {
+      status = 'pending';
+      message = 'Payment is being processed...';
+    } else if (code === 0) {
+      status = 'success';
+      message = 'Payment completed successfully!';
+    } else if (code === 1032) {
+      status = 'cancelled';
+      message = 'Payment was cancelled.';
+    } else if (code === 1037) {
+      status = 'timeout';
+      message = 'Payment request timed out. Please try again.';
+    } else if (code === 1) {
+      status = 'failed';
+      message = 'Insufficient funds.';
+    } else {
+      status = 'failed';
+      message = result.ResultDesc || 'Payment failed.';
+    }
+    res.json({ status, message, resultCode: code });
+  } catch (err) {
+    // If query fails with "The transaction is being processed", it's still pending
+    if (err.message && err.message.includes('being processed')) {
+      return res.json({ status: 'pending', message: 'Payment is being processed...' });
+    }
+    res.json({ status: 'pending', message: 'Checking payment status...' });
+  }
+};
+
 exports.callback = async (req, res) => {
   try {
     const { Body } = req.body;

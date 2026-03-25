@@ -76,6 +76,28 @@ class MpesaService {
     return res.data;
   }
 
+  async stkQuery(checkoutRequestID) {
+    const token = await this.getAccessToken();
+    const timestamp = this.getTimestamp();
+    const password = Buffer.from(`${this.shortcode}${this.passkey}${timestamp}`).toString('base64');
+    const payload = JSON.stringify({
+      BusinessShortCode: this.shortcode,
+      Password: password,
+      Timestamp: timestamp,
+      CheckoutRequestID: checkoutRequestID,
+    });
+    const res = await this._request({
+      hostname: this.baseUrl,
+      path: '/mpesa/stkpushquery/v1/query',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }, payload);
+    return res.data;
+  }
+
   formatPhoneNumber(phone) {
     let formatted = String(phone).replace(/\s+/g, '');
     if (formatted.startsWith('0')) formatted = '254' + formatted.substring(1);

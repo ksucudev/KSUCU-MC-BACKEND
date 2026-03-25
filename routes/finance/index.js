@@ -8,6 +8,7 @@ const transactionController = require('../../controllers/finance/transactionCont
 // Member endpoints (uses user_s cookie, not admin auth)
 router.get('/my-contributions', financeMemberAuth, transactionController.getMyContributions);
 router.post('/member-pay', financeMemberAuth, mpesaController.memberPayment);
+router.get('/mpesa/status/:checkoutRequestID', financeMemberAuth, mpesaController.checkStatus);
 
 // M-Pesa callback (public, no auth - Safaricom calls this)
 router.post('/mpesa/callback', mpesaController.callback);
