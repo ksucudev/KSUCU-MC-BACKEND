@@ -17,6 +17,11 @@ exports.initiatePayment = async (req, res) => {
       accountReference: (category || 'Offering').charAt(0).toUpperCase() + (category || 'offering').slice(1),
       transactionDesc: `CU ${category || 'offering'} payment`,
     });
+    // Store pending payment for callback linking
+    if (result.CheckoutRequestID) {
+      pendingPayments.set(result.CheckoutRequestID, { userId: req.user?.id, category: category || 'offering' });
+      setTimeout(() => pendingPayments.delete(result.CheckoutRequestID), 300000);
+    }
     res.json({ message: 'STK push sent. Check your phone.', data: result });
   } catch (err) {
     res.status(500).json({ message: 'M-Pesa request failed.', error: err.message });
