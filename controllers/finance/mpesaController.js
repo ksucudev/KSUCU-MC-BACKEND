@@ -84,7 +84,7 @@ exports.checkStatus = async (req, res) => {
     }
 
     const code = Number(result.ResultCode);
-    if (isNaN(code)) {
+    if (isNaN(code) || code === 4999) {
       return res.json({ status: 'pending', message: 'Payment is being processed...' });
     }
 

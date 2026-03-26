@@ -4,6 +4,5 @@ const controller = require("../../controllers/finance/mpesaController");
 const authorize = require("../../middlewares/financeAuthorize");
 
 router.post("/stkpush", authorize("admin", "treasurer"), controller.initiatePayment);
-router.get("/status/:checkoutRequestID", authorize("admin", "treasurer"), controller.checkStatus);
 
 module.exports = router;
