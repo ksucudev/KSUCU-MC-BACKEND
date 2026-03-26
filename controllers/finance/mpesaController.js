@@ -1,5 +1,6 @@
 const mpesaService = require('../../services/mpesaService');
 const Transaction = require('../../models/financeTransaction');
+const User = require('../../models/user');
 const { logFinanceAction } = require('../../middlewares/financeAudit');
 
 // In-memory map of CheckoutRequestID → { userId, category } for linking callbacks to users
@@ -132,12 +133,32 @@ exports.callback = async (req, res) => {
       const phone = getValue('PhoneNumber');
       // Get stored user info from pending map
       const pending = pendingPayments.get(CheckoutRequestID);
+      const phoneStr = String(phone);
+
+      // Look up payer name: first from pending user, then by phone in users collection
+      let payerName = null;
+      if (pending?.userId) {
+        try {
+          const user = await User.findById(pending.userId).select('username');
+          if (user) payerName = user.username;
+        } catch {}
+      }
+      if (!payerName) {
+        try {
+          // Try matching phone as 254... or 0...
+          const phone0 = phoneStr.startsWith('254') ? '0' + phoneStr.substring(3) : phoneStr;
+          const user = await User.findOne({ $or: [{ phone: phoneStr }, { phone: phone0 }] }).select('username');
+          if (user) payerName = user.username;
+        } catch {}
+      }
+
       const txData = {
         type: 'cash_in',
         category: pending?.category || 'offering',
         amount,
         source: 'mpesa',
-        phone: String(phone),
+        phone: phoneStr,
+        payer_name: payerName || phoneStr,
         description: `M-Pesa payment ${mpesaCode}`,
       };
       if (pending?.userId) txData.recorded_by = pending.userId;
