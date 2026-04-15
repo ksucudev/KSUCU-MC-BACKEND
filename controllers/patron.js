@@ -36,11 +36,12 @@ exports.login = async (req, res) => {
         res.clearCookie('socket_token');
         res.clearCookie('sadmin_token');
 
+        const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('patron_token', token, {
             httpOnly: true,
-            secure: true,
+            secure: isProduction,
             maxAge: 4 * 60 * 60 * 1000,
-            sameSite: 'None',
+            sameSite: isProduction ? 'None' : 'Lax',
         });
 
         res.status(200).json({ message: 'Login successful' });

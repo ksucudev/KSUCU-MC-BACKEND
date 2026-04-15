@@ -22,6 +22,6 @@ const userSchema = new mongoose.Schema({
     enum: ['treasurer', 'auditor', 'chair_accounts', 'chairperson', null],
     default: null
   }
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
