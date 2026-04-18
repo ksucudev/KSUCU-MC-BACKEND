@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Users = require('../models/user');
 const sAdmin = require('../models/superAdmin');
+const FinanceUser = require('../models/financeUser');
 const Feedback = require('../models/feedbackSchema');
 const Message = require('../models/message');
 const PollingStats = require('../models/pollingStats');
@@ -40,9 +41,17 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'Email and password are required' });
         }
 
-        const user = await sAdmin.findOne({ email });
+        let user = await sAdmin.findOne({ email });
+        let isFinanceUser = false;
+
         if (!user) {
-            console.log('Super Admin not found with email:', email);
+            console.log('Super Admin not found, checking Finance users...');
+            user = await FinanceUser.findOne({ email });
+            if (user) isFinanceUser = true;
+        }
+
+        if (!user) {
+            console.log('User not found with email:', email);
             return res.status(401).json({ message: 'Invalid username or password' });
         }
 
@@ -54,9 +63,14 @@ exports.login = async (req, res) => {
         }
         
         console.log('Super Admin login successful for:', email);
-        console.log('🔐 Creating token with JWT_ADMIN_SECRET:', process.env.JWT_ADMIN_SECRET ? `${process.env.JWT_ADMIN_SECRET.substring(0, 5)}...` : 'missing');
+        const tokenData = { userId: user._id };
+        if (isFinanceUser) {
+            tokenData.role = user.role;
+        } else {
+            tokenData.role = 'admin'; // default for superadmins
+        }
 
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_ADMIN_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign(tokenData, process.env.JWT_ADMIN_SECRET, { expiresIn: '1h' });
 
         // Clear user session cookies to avoid conflicts
         res.clearCookie('user_s');
